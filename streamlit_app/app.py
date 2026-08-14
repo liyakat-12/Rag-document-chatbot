@@ -12,6 +12,19 @@ from typing import Any
 import streamlit as st
 
 from api_client import RagClient
+from backend_runtime import start_backend
+
+
+@st.cache_resource(show_spinner="Starting backend service…")
+def _bootstrap_backend() -> bool:
+    """Ensure the FastAPI backend is reachable, starting it in-process if
+    nothing is already listening (e.g. on Streamlit Community Cloud, where
+    only this single service gets deployed)."""
+    start_backend()
+    return True
+
+
+_bootstrap_backend()
 
 API_BASE = os.getenv("VITE_API_BASE_URL") or os.getenv("API_BASE_URL") or "http://localhost:8000/api/v1"
 MAX_MB = int(os.getenv("MAX_UPLOAD_SIZE_MB", "40"))

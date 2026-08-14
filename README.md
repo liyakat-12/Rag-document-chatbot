@@ -118,6 +118,40 @@ docker compose up --build
 
 ---
 
+## Deploying to Streamlit Community Cloud (free)
+
+Streamlit Community Cloud only runs a single process on a single exposed
+port, so `streamlit_app/app.py` automatically boots the FastAPI backend
+in-process (see `streamlit_app/backend_runtime.py`) if nothing is already
+listening on port 8000 — no separate backend deployment needed.
+
+1. Push this repo to GitHub (already done if you're reading this from there).
+2. Go to [share.streamlit.io](https://share.streamlit.io) and sign in with GitHub.
+3. Click **New app** → select this repo → branch `main` → main file path
+   `streamlit_app/app.py` → **Deploy**.
+4. That's it. With no configuration, it runs fully free/offline
+   (`LLM_PROVIDER=extractive`, `EMBEDDING_PROVIDER=local`).
+5. Optional: to use a real LLM instead of the offline extractive mode, open
+   **App settings → Secrets** and add e.g.:
+   ```toml
+   LLM_PROVIDER = "openai"
+   OPENAI_API_KEY = "sk-..."
+   ```
+
+Notes:
+
+- Storage is **ephemeral** — uploaded PDFs, the vector index, and chat
+  history reset whenever the app restarts or sleeps (after ~12h idle).
+  Fine for demos/portfolios; not for production data.
+- Free tier is capped at roughly 1 GB RAM — keep uploaded PDFs modest in
+  size and number.
+- Hugging Face Spaces is **not** a free option for this app as of mid-2026:
+  HF now requires a PRO plan to create compute-backed (Docker/Gradio)
+  Spaces on free personal accounts; only static or ZeroGPU Gradio Spaces
+  remain free, which don't fit this architecture.
+
+---
+
 ## Environment Variables
 
 See [`.env.example`](.env.example) for the full list. Key variables:
