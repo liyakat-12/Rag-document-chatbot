@@ -1,0 +1,61 @@
+# =============================================================================
+# RAG Document Chatbot — Python Dependencies
+# Requires Python 3.12 or 3.13 (recommended: 3.12)
+# Install: pip install -r requirements.txt
+# =============================================================================
+
+# --- Web Framework ----------------------------------------------------------
+fastapi>=0.115.0,<0.116
+uvicorn[standard]>=0.34.0,<0.35
+python-multipart>=0.0.20
+sse-starlette>=2.2.0
+
+# --- Config & Validation ----------------------------------------------------
+pydantic>=2.10.0,<3
+pydantic-settings>=2.7.0
+python-dotenv>=1.0.1
+
+# --- LangChain & LLM --------------------------------------------------------
+langchain>=0.3.14,<0.4
+langchain-community>=0.3.14,<0.4
+langchain-openai>=0.3.0,<0.4
+langchain-anthropic>=0.3.1,<0.4
+langchain-text-splitters>=0.3.4,<0.4
+openai>=1.59.0,<2
+tiktoken>=0.8.0
+
+# --- Vector Store & Search --------------------------------------------------
+faiss-cpu>=1.9.0
+rank-bm25>=0.2.2
+numpy>=1.26.0,<2.2
+fastembed>=0.5.0
+
+# --- Document Processing ----------------------------------------------------
+pypdf>=5.1.0
+
+# --- Database ---------------------------------------------------------------
+sqlalchemy>=2.0.36,<2.1
+aiosqlite>=0.20.0
+greenlet>=3.1.0
+
+# --- Caching & Utilities ----------------------------------------------------
+cachetools>=5.5.0
+httpx>=0.28.0
+aiofiles>=24.1.0
+tenacity>=9.0.0
+
+# --- PDF Export (conversation download) -------------------------------------
+fpdf2>=2.8.2
+markdown>=3.7
+
+# --- Logging & Monitoring ---------------------------------------------------
+structlog>=24.4.0
+
+# --- Streamlit UI -----------------------------------------------------------
+streamlit>=1.41.0
+
+# --- Testing ----------------------------------------------------------------
+pytest>=8.3.0
+pytest-asyncio>=0.25.0
+pytest-cov>=6.0.0
+anyio>=4.7.0

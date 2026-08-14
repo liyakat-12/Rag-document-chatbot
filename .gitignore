@@ -1,0 +1,41 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+.env
+
+# Packaging
+dist/
+build/
+*.egg-info/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Data / runtime
+uploads/*
+!uploads/.gitkeep
+vector_store/*
+!vector_store/.gitkeep
+data/*
+!data/.gitkeep
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# Tests / coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# OS
+.DS_Store
+Thumbs.db
