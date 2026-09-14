@@ -53,6 +53,17 @@ async def test_admin_stats(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_system_info(client: AsyncClient):
+    res = await client.get("/api/v1/admin/system")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["retrieval_strategy"] == "hybrid_rrf"
+    assert "llm_provider" in data
+    assert "openai_api_key" not in data
+
+
+@pytest.mark.asyncio
 async def test_delete_missing_document(client: AsyncClient):
     res = await client.delete("/api/v1/document/does-not-exist")
     assert res.status_code == 404
+

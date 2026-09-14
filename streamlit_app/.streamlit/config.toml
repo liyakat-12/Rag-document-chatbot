@@ -8,8 +8,9 @@ enableXsrfProtection = true
 gatherUsageStats = false
 
 [theme]
-primaryColor = "#0d6e5a"
-backgroundColor = "#f3f0ea"
-secondaryBackgroundColor = "#ebe6dc"
-textColor = "#1c1915"
+# Aligned with DocuMind AI light theme (custom CSS still applies on top)
+primaryColor = "#1f6b5c"
+backgroundColor = "#f6f7f9"
+secondaryBackgroundColor = "#ffffff"
+textColor = "#1a2332"
 font = "sans serif"

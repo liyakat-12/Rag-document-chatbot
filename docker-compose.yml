@@ -1,22 +1,30 @@
+# Production-oriented Compose for DocuMind AI
+# Usage: docker compose -f docker-compose.yml up --build -d
+
 services:
   backend:
     build:
       context: .
       dockerfile: Dockerfile
+    command: >
+      uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
     ports:
       - "8000:8000"
     env_file:
       - .env
+    environment:
+      - PYTHONPATH=/app
     volumes:
-      - ./uploads:/app/uploads
-      - ./vector_store:/app/vector_store
-      - ./data:/app/data
+      - documind_uploads:/app/uploads
+      - documind_vectors:/app/vector_store
+      - documind_data:/app/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health')"]
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 5
+      start_period: 40s
 
   frontend:
     build:
@@ -26,6 +34,7 @@ services:
       streamlit run streamlit_app/app.py
       --server.port=8501
       --server.address=0.0.0.0
+      --browser.gatherUsageStats=false
     ports:
       - "8501:8501"
     env_file:
@@ -33,8 +42,13 @@ services:
     environment:
       - API_BASE_URL=http://backend:8000/api/v1
       - MAX_UPLOAD_SIZE_MB=40
-    volumes:
-      - ./streamlit_app:/app/streamlit_app
+      - PYTHONPATH=/app
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     restart: unless-stopped
+
+volumes:
+  documind_uploads:
+  documind_vectors:
+  documind_data:

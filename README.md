@@ -1,243 +1,286 @@
-# RAG Document Chatbot
+# DocuMind AI
 
-Production-ready **Retrieval-Augmented Generation (RAG)** chatbot. Upload PDFs, ask questions, and get grounded answers with source citations, confidence scores, and streaming responses.
+**Ask your documents. Get grounded answers.**
+
+Enterprise-style **Retrieval-Augmented Generation (RAG)** assistant for private PDFs.
+Upload documents, ask questions, and receive answers with source citations, grounding confidence, and hybrid retrieval diagnostics.
+
+---
+
+## Problem
+
+Teams need trustworthy answers from their own PDFs — resumes, policies, manuals — without sending everything to a black-box chatbot that invents facts.
+
+## Solution
+
+DocuMind AI indexes your PDFs locally, retrieves evidence with **FAISS + BM25 → RRF fusion**, then answers only from that context. If evidence is missing, it says so.
 
 ---
 
 ## Features
 
-| Core | UX | Bonus |
-|------|----|-------|
-| Multi-PDF upload & indexing | Dark mode | Hybrid search (BM25 + FAISS) |
-| Chunking + OpenAI embeddings | Drag-and-drop upload | Metadata filtering |
-| FAISS vector store | Typing animation | Semantic caching |
-| RetrievalQA with grounded prompts | Streaming answers | Token counting |
-| Chat memory & multi-session | Markdown rendering | Conversation summarization |
-| Source citations | Copy answer | Document statistics |
-| Confidence score | Download chat as PDF | Admin dashboard |
-| Delete / re-index documents | Rate answers (👍/👎) | Configurable LLM provider |
+- Multi-PDF upload (40 MB) with real ingestion stage timings
+- Hybrid retrieval (semantic + keyword) with expandable retrieval details
+- Grounded answers, citations, heuristic grounding confidence
+- Streaming chat, conversation history, follow-up query expansion
+- Semantic cache, thumbs feedback, PDF conversation export
+- Documents / Analytics / Settings / About UI
+- Light & dark enterprise themes
+- Offline **extractive** mode + local FastEmbed embeddings
+- Optional OpenAI / Azure OpenAI / Anthropic LLMs
+- Docker Compose, tests, and an evaluation harness
 
 ---
 
 ## Architecture
 
 ```
-PDF → Extract → Clean → Chunk → Embed → FAISS
-                                           ↓
-Question → Hybrid Retriever (BM25 + Vector) → LLM → Answer + Sources
+                ┌─────────────────┐
+                │   PDF Upload    │
+                └────────┬────────┘
+                         ↓
+                ┌─────────────────┐
+                │ Text Extraction │
+                └────────┬────────┘
+                         ↓
+                ┌─────────────────┐
+                │    Chunking     │
+                └────────┬────────┘
+                         ↓
+                ┌─────────────────┐
+                │   Embeddings    │
+                └────────┬────────┘
+                         ↓
+                ┌─────────────────────┐
+                │ FAISS + BM25 Index  │
+                └──────────┬──────────┘
+                           │
+Question ───────────────→ Retrieval
+                           ↓
+                    Hybrid Fusion (RRF)
+                           ↓
+                    Context Builder
+                           ↓
+                         LLM / Extractive
+                           ↓
+                Answer + Citations
 ```
 
-**Never hallucinates:** if context is insufficient, the model responds exactly:
+### Hybrid retrieval
 
-> I couldn't find that information in the uploaded documents.
+1. **Semantic (FAISS)** — finds paraphrased / meaning-similar chunks  
+2. **Keyword (BM25)** — finds exact lexical matches  
+3. **RRF fusion** — combines rankings (`HYBRID_SEARCH_WEIGHT` = dense weight)
 
 ---
 
-## Project Structure
+## Technology stack
+
+| Layer | Tech |
+|-------|------|
+| UI | Streamlit |
+| API | FastAPI + Uvicorn + SSE |
+| RAG | LangChain |
+| Vectors | FAISS (`IndexFlatL2`) |
+| Keywords | rank-bm25 |
+| Embeddings | FastEmbed (`BAAI/bge-small-en-v1.5`) or OpenAI |
+| PDF | pypdf |
+| DB | SQLite + SQLAlchemy + aiosqlite |
+
+---
+
+## Project structure
 
 ```
-rag-document-chatbot/
-├── backend/app/       # FastAPI + RAG pipeline
-├── streamlit_app/     # Streamlit UI (primary frontend)
-├── frontend/          # Legacy React UI (optional, not required)
+RAG_Document_Chatbot/
+├── backend/app/          # FastAPI + RAG pipeline
+│   ├── api/              # documents, chat, admin
+│   ├── rag/              # ingest, FAISS, BM25, QA, LLM factory
+│   ├── services/         # orchestration
+│   └── db/               # SQLAlchemy models
+├── streamlit_app/        # DocuMind AI UI
+│   ├── components/       # chat, documents, analytics, …
+│   └── styles/           # light/dark themes
+├── evals/                # retrieval / groundedness evaluation
 ├── tests/
-├── uploads/
-├── vector_store/
-├── data/
-├── Dockerfile
+├── uploads/ · vector_store/ · data/
 ├── docker-compose.yml
-├── requirements.txt
-└── .env.example
+└── requirements.txt
 ```
 
 ---
 
-## Requirements
-
-- Python **3.12 or 3.13** (recommended: 3.12)
-- OpenAI API key (or Azure OpenAI / Anthropic + OpenAI embeddings)
-- No Node.js required (Streamlit UI)
-
----
-
-## Setup
-
-### 1. Clone & environment
+## Installation
 
 ```bash
 cd RAG_Document_Chatbot
-copy .env.example .env   # Windows
-# cp .env.example .env   # macOS/Linux
-```
+copy .env.example .env          # Windows
+# cp .env.example .env          # macOS/Linux
 
-Edit `.env` and set at least:
-
-```env
-OPENAI_API_KEY=sk-your-key-here
-LLM_PROVIDER=openai
-MAX_UPLOAD_SIZE_MB=40
-```
-
-### 2. Backend
-
-```bash
-# Prefer Python 3.12
 py -3.12 -m venv .venv
-# Windows:
-.venv\Scripts\activate
-# macOS/Linux:
-# python3.12 -m venv .venv && source .venv/bin/activate
+.venv\Scripts\activate          # Windows
+# source .venv/bin/activate     # macOS/Linux
 
 pip install -r requirements.txt
-uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Or double-click `run_backend.bat` on Windows.
+Default `.env` uses **extractive** LLM + **local** embeddings (no paid API required).
 
-API docs: [http://localhost:8000/docs](http://localhost:8000/docs)
+---
 
-### 3. Streamlit UI
+## Configuration
+
+See `.env.example`. Important keys:
+
+| Variable | Meaning |
+|----------|---------|
+| `LLM_PROVIDER` | `extractive` · `openai` · `azure_openai` · `anthropic` |
+| `EMBEDDING_PROVIDER` | `local` · `openai` |
+| `RETRIEVER_TOP_K` | Fused chunks returned |
+| `HYBRID_SEARCH_WEIGHT` | Dense weight in RRF |
+| `MAX_UPLOAD_SIZE_MB` | Default 40 |
+
+Never commit `.env` or API keys.
+
+---
+
+## Running locally
+
+**Backend**
 
 ```bash
-# From project root, with venv activated:
+uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+API docs: http://localhost:8000/docs
+
+**UI**
+
+```bash
 streamlit run streamlit_app/app.py --server.port 8501
 ```
 
-Or double-click `run_frontend.bat`.
+UI: http://localhost:8501
 
-UI: [http://localhost:8501](http://localhost:8501)
+Or use `run_backend.bat` / `run_frontend.bat` on Windows.
 
-### 4. Docker (optional)
+---
+
+## Docker
 
 ```bash
-docker compose up --build
+docker compose up --build -d
 ```
 
-- Backend: `http://localhost:8000`
-- Streamlit: `http://localhost:8501`
+- UI: http://localhost:8501  
+- API: http://localhost:8000  
+
+Data persists in Docker volumes (`uploads`, `vector_store`, `data`).
 
 ---
 
-## Deploying to Streamlit Community Cloud (free)
+## Deploy
 
-Streamlit Community Cloud only runs a single process on a single exposed
-port, so `streamlit_app/app.py` automatically boots the FastAPI backend
-in-process (see `streamlit_app/backend_runtime.py`) if nothing is already
-listening on port 8000 — no separate backend deployment needed.
+### Option A — Streamlit Community Cloud (easiest public URL)
 
-1. Push this repo to GitHub (already done if you're reading this from there).
-2. Go to [share.streamlit.io](https://share.streamlit.io) and sign in with GitHub.
-3. Click **New app** → select this repo → branch `main` → main file path
-   `streamlit_app/app.py` → **Deploy**.
-4. That's it. With no configuration, it runs fully free/offline
-   (`LLM_PROVIDER=extractive`, `EMBEDDING_PROVIDER=local`).
-5. Optional: to use a real LLM instead of the offline extractive mode, open
-   **App settings → Secrets** and add e.g.:
-   ```toml
-   LLM_PROVIDER = "openai"
-   OPENAI_API_KEY = "sk-..."
-   ```
+Your app already boots FastAPI **in-process** via `streamlit_app/backend_runtime.py`, so one Streamlit service is enough.
+
+1. Push this repo to GitHub (exclude `.env` — already gitignored).
+2. Go to [share.streamlit.io](https://share.streamlit.io) → **New app**.
+3. Select repo `liyakat-12/Rag-document-chatbot`, branch `main`.
+4. Main file path: `streamlit_app/app.py`
+5. Python version: **3.12**
+6. In **Advanced settings → Secrets**, paste values from `streamlit_app/.streamlit/secrets.toml.example` and set your real `OPENAI_API_KEY` (or use `LLM_PROVIDER = "extractive"` with no key).
+7. Deploy.
 
 Notes:
+- Free Cloud has limited CPU/RAM; local FastEmbed may be slow on first run.
+- Uploaded docs on Cloud are ephemeral unless you add external storage later.
 
-- Storage is **ephemeral** — uploaded PDFs, the vector index, and chat
-  history reset whenever the app restarts or sleeps (after ~12h idle).
-  Fine for demos/portfolios; not for production data.
-- Free tier is capped at roughly 1 GB RAM — keep uploaded PDFs modest in
-  size and number.
-- Hugging Face Spaces is **not** a free option for this app as of mid-2026:
-  HF now requires a PRO plan to create compute-backed (Docker/Gradio)
-  Spaces on free personal accounts; only static or ZeroGPU Gradio Spaces
-  remain free, which don't fit this architecture.
+### Option B — Docker on a VPS (DigitalOcean / AWS / Azure VM)
 
----
+1. Install Docker + Compose on the server.
+2. Copy the project (or `git clone`) and create `.env` from `.env.example`.
+3. Run:
 
-## Environment Variables
+```bash
+docker compose up --build -d
+```
 
-See [`.env.example`](.env.example) for the full list. Key variables:
+4. Open firewall ports **8501** (UI) and optionally **8000** (API).
+5. Point a domain / reverse proxy (Nginx/Caddy) at port 8501.
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `LLM_PROVIDER` | `openai` \| `azure_openai` \| `anthropic` | `openai` |
-| `OPENAI_API_KEY` | OpenAI API key | — |
-| `OPENAI_CHAT_MODEL` | Chat model | `gpt-4o-mini` |
-| `OPENAI_EMBEDDING_MODEL` | Embedding model | `text-embedding-3-small` |
-| `MAX_UPLOAD_SIZE_MB` | Upload limit | `40` |
-| `CHUNK_SIZE` / `CHUNK_OVERLAP` | Splitter settings | `1000` / `200` |
-| `DATABASE_URL` | Async SQLAlchemy URL | SQLite file |
-| `SEMANTIC_CACHE_ENABLED` | Cache similar queries | `true` |
+### Option C — Hugging Face Spaces (good public demo)
 
----
+**Yes — HF is a solid choice** for this app (better than Vercel).
 
-## API Endpoints
+1. Push the repo to GitHub.
+2. Create a Space: [huggingface.co/new-space](https://huggingface.co/new-space)
+   - SDK: **Docker**
+   - Connect your GitHub repo
+3. Space reads the root `Dockerfile` (Streamlit on port **7860**, API in-process).
+4. Optional: copy Space card text from `README_HF.md` into the Space README.
+5. Add secrets under **Settings → Variables and secrets** (see `README_HF.md`).
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/api/v1/upload` | Upload PDF(s) |
-| `POST` | `/api/v1/chat` | Chat (non-streaming, `stream=false`) |
-| `POST` | `/api/v1/chat/stream` | Chat (SSE streaming) |
-| `GET` | `/api/v1/history` | List chat sessions |
-| `GET` | `/api/v1/documents` | List documents |
-| `DELETE` | `/api/v1/document/{id}` | Delete a document |
-| `POST` | `/api/v1/reindex` | Rebuild vector index |
-| `GET` | `/api/v1/admin/stats` | Admin dashboard stats |
-| `GET` | `/api/v1/health` | Health check |
+UI URL will look like: `https://huggingface.co/spaces/<you>/documind-ai`
 
 ---
 
-## How RAG Works
+### Option D — Keep running locally
 
-1. **Upload** — PDFs are validated (type, size ≤ 40 MB, magic bytes) and stored under `uploads/`.
-2. **Parse** — `PyPDFLoader` extracts page text; text is cleaned.
-3. **Chunk** — `RecursiveCharacterTextSplitter` creates overlapping chunks with metadata (`filename`, `page_number`, `chunk_id`).
-4. **Embed** — OpenAI embeddings are written to **FAISS**.
-5. **Retrieve** — Hybrid search (dense FAISS + BM25) fused with Reciprocal Rank Fusion.
-6. **Generate** — LLM answers **only** from retrieved context, with citations and a confidence heuristic.
-7. **Memory** — Sessions and messages persist in SQLite; long chats are summarized.
+```bash
+uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
+streamlit run streamlit_app/app.py --server.port 8501
+```
 
 ---
 
-## Screenshots
+## Example usage
 
-> Place screenshots in `frontend/public/screenshots/` and link them here.
+1. Open **Documents** → upload a PDF → confirm pipeline stages → **Document ready**  
+2. Open **Chat** → try a suggested question  
+3. Inspect **Sources**, **Grounding confidence**, and optional **Retrieval details**  
+4. Rate answers; export the conversation as PDF  
 
-| Light mode | Dark mode |
-|------------|-----------|
-| ![Chat light](frontend/public/screenshots/chat-light.png) | ![Chat dark](frontend/public/screenshots/chat-dark.png) |
+---
+
+## Evaluation
+
+```bash
+python -m evals.run_eval           # local retrieval checks (needs indexed docs)
+python -m evals.run_eval --api     # live chat groundedness checks
+```
+
+Dataset: `evals/dataset.json`. Scores are measured, not fabricated.
 
 ---
 
 ## Testing
 
 ```bash
-pip install -r requirements.txt
 pytest -q
 ```
 
-- `tests/unit/` — sanitization, cleaning, confidence, RRF fusion
-- `tests/integration/` — health, history, upload validation, admin stats
+---
+
+## Limitations
+
+- Extractive mode returns grounded snippets, not fluent generative prose  
+- Confidence is a **heuristic** from retrieval scores, not a calibrated probability  
+- BM25 lives in memory and is rebuilt after index changes  
+- No built-in multi-user authentication on the API  
 
 ---
 
-## Security
+## Future improvements
 
-- PDF-only uploads with content-type + magic-byte checks
-- Filename sanitization (no path traversal)
-- Max upload size: **40 MB**
-- Secrets loaded from environment (never hardcoded)
-
----
-
-## Future Improvements
-
-- Multi-user auth (JWT / OAuth)
-- Persistent vector DB (pgvector / Qdrant)
-- OCR for scanned PDFs
-- Evaluations (RAGAS) and answer grounding checks
-- Role-based document collections
+- Auth / multi-tenant workspaces  
+- Persistent BM25 + async ingest progress SSE  
+- Stronger query rewriting for follow-ups  
+- Richer evaluation (RAGAS / human labels)  
 
 ---
 
 ## License
 
-MIT
+Use and modify for your projects. Keep secrets out of git.

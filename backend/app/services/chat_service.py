@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import time
 from collections.abc import AsyncIterator
 from typing import Any, Optional
 from uuid import uuid4
@@ -16,12 +17,14 @@ from backend.app.rag.llm_factory import get_chat_llm
 from backend.app.rag.qa_chain import (
     NOT_FOUND_MESSAGE,
     build_qa_result,
+    expand_followup_query,
     generate_answer,
-    retrieve,
+    retrieve_detailed,
     stream_answer,
 )
 from backend.app.rag.semantic_cache import lookup_cache, store_cache
 from backend.app.utils.logging import get_logger
+from backend.app.utils.titles import make_conversation_title
 from backend.app.utils.tokens import count_tokens
 
 logger = get_logger(__name__)
@@ -31,7 +34,6 @@ async def create_session(session: AsyncSession, title: str = "New Chat") -> Chat
     chat = ChatSession(title=title)
     session.add(chat)
     await session.flush()
-    # Re-fetch with messages eagerly loaded to avoid async lazy-load errors
     loaded = await get_session(session, chat.id)
     return loaded or chat
 
@@ -79,25 +81,50 @@ async def _ensure_session(session: AsyncSession, session_id: Optional[str], firs
         chat = await get_session(session, session_id)
         if chat:
             return chat
-    title = first_message.strip()[:60] or "New Chat"
+    title = make_conversation_title(first_message)
     return await create_session(session, title=title)
+
+
+async def _load_messages(session: AsyncSession, chat_id: str) -> list[ChatMessage]:
+    result = await session.execute(
+        select(ChatMessage)
+        .where(ChatMessage.session_id == chat_id)
+        .order_by(ChatMessage.created_at)
+    )
+    return list(result.scalars().all())
+
+
+def _format_recent_history(messages: list[ChatMessage], exclude_last: bool = True) -> str:
+    """Compact recent turns for the QA prompt (not a full transcript dump)."""
+    usable = messages[:-1] if exclude_last and messages else messages
+    recent = usable[-6:]
+    if not recent:
+        return ""
+    lines: list[str] = []
+    for m in recent:
+        role = m.role
+        content = (m.content or "")[:400]
+        lines.append(f"{role}: {content}")
+    return "\n".join(lines)
+
+
+def _prior_user_questions(messages: list[ChatMessage]) -> list[str]:
+    """User questions before the latest turn (latest is the current question)."""
+    users = [m.content for m in messages if m.role == "user"]
+    return users[:-1] if len(users) > 1 else []
 
 
 async def summarize_if_needed(session: AsyncSession, chat: ChatSession) -> str:
     """Summarize older turns when conversation grows long."""
     from backend.app.config import get_settings
 
-    # Offline extractive mode: skip LLM summarization entirely
     if get_settings().llm_provider == "extractive":
-        return chat.summary or ""
+        # Offline mode: build a tiny extractive summary from recent turns
+        messages = await _load_messages(session, chat.id)
+        history = _format_recent_history(messages, exclude_last=True)
+        return history[:800] or (chat.summary or "")
 
-    # Always query explicitly — never lazy-load relationships in async SQLAlchemy
-    result = await session.execute(
-        select(ChatMessage)
-        .where(ChatMessage.session_id == chat.id)
-        .order_by(ChatMessage.created_at)
-    )
-    messages = list(result.scalars().all())
+    messages = await _load_messages(session, chat.id)
     if len(messages) < 8:
         return chat.summary or ""
 
@@ -128,9 +155,9 @@ async def chat(
     document_ids: Optional[list[str]] = None,
 ) -> dict[str, Any]:
     """Non-streaming chat turn with memory, cache, citations, confidence."""
+    t_total = time.perf_counter()
     chat_session = await _ensure_session(session, session_id, message)
 
-    # Persist user message
     user_msg = ChatMessage(
         id=str(uuid4()),
         session_id=chat_session.id,
@@ -141,7 +168,6 @@ async def chat(
     session.add(user_msg)
     await session.flush()
 
-    # Semantic cache
     cached = await lookup_cache(session, message)
     if cached:
         result = build_qa_result(
@@ -149,16 +175,40 @@ async def chat(
             docs_with_scores=[],
             tokens_used=0,
             cached=True,
+            retrieval={"strategy": "semantic_cache", "latency_ms": 0},
         )
-        # Restore sources from cache
         result["sources"] = cached["sources"]
         result["retrieved_chunks"] = cached["sources"]
         result["confidence"] = cached["confidence"]
     else:
+        messages = await _load_messages(session, chat_session.id)
         summary = await summarize_if_needed(session, chat_session)
-        docs = await retrieve(message, document_ids=document_ids)
-        answer, tokens = await generate_answer(message, docs, summary=summary)
-        result = build_qa_result(answer, docs, tokens_used=tokens, cached=False)
+        history = _format_recent_history(messages, exclude_last=True)
+        retrieval_query = expand_followup_query(message, _prior_user_questions(messages))
+
+        t_ret = time.perf_counter()
+        detailed = await retrieve_detailed(retrieval_query, document_ids=document_ids)
+        retrieval_ms = (time.perf_counter() - t_ret) * 1000
+        docs = detailed.results
+        retrieval_meta = {
+            **detailed.details,
+            "retrieval_query": retrieval_query if retrieval_query != message else None,
+            "latency_ms": round(retrieval_ms, 2),
+        }
+
+        t_gen = time.perf_counter()
+        answer, tokens = await generate_answer(
+            message, docs, summary=summary, history=history
+        )
+        generation_ms = (time.perf_counter() - t_gen) * 1000
+        result = build_qa_result(
+            answer, docs, tokens_used=tokens, cached=False, retrieval=retrieval_meta
+        )
+        result["timings"] = {
+            "retrieval_ms": round(retrieval_ms, 2),
+            "generation_ms": round(generation_ms, 2),
+            "total_ms": round((time.perf_counter() - t_total) * 1000, 2),
+        }
         if answer != NOT_FOUND_MESSAGE:
             await store_cache(
                 session,
@@ -167,6 +217,14 @@ async def chat(
                 result["sources"],
                 result["confidence"],
             )
+        logger.info(
+            "chat_completed",
+            session_id=chat_session.id,
+            retrieval_ms=round(retrieval_ms, 2),
+            generation_ms=round(generation_ms, 2),
+            chunks=len(docs),
+            cached=False,
+        )
 
     assistant_msg = ChatMessage(
         id=str(uuid4()),
@@ -199,6 +257,7 @@ async def chat_stream(
       {"event": "token", "content": "..."}
       {"event": "done", ...}
     """
+    t_total = time.perf_counter()
     chat_session = await _ensure_session(session, session_id, message)
 
     user_msg = ChatMessage(
@@ -219,6 +278,7 @@ async def chat_stream(
             "sources": cached["sources"],
             "confidence": cached["confidence"],
             "cached": True,
+            "retrieval": {"strategy": "semantic_cache"},
         }
         yield {"event": "token", "content": cached["answer"]}
         assistant_msg = ChatMessage(
@@ -240,12 +300,26 @@ async def chat_stream(
             "confidence": cached["confidence"],
             "tokens_used": 0,
             "cached": True,
+            "timings": {"total_ms": round((time.perf_counter() - t_total) * 1000, 2)},
         }
         return
 
+    messages = await _load_messages(session, chat_session.id)
     summary = await summarize_if_needed(session, chat_session)
-    docs = await retrieve(message, document_ids=document_ids)
-    result_shell = build_qa_result("", docs, tokens_used=0)
+    history = _format_recent_history(messages, exclude_last=True)
+    retrieval_query = expand_followup_query(message, _prior_user_questions(messages))
+
+    t_ret = time.perf_counter()
+    detailed = await retrieve_detailed(retrieval_query, document_ids=document_ids)
+    retrieval_ms = (time.perf_counter() - t_ret) * 1000
+    docs = detailed.results
+    retrieval_meta = {
+        **detailed.details,
+        "retrieval_query": retrieval_query if retrieval_query != message else None,
+        "latency_ms": round(retrieval_ms, 2),
+    }
+    result_shell = build_qa_result("", docs, tokens_used=0, retrieval=retrieval_meta)
+
     yield {
         "event": "meta",
         "session_id": chat_session.id,
@@ -253,17 +327,18 @@ async def chat_stream(
         "confidence": 0.0,
         "cached": False,
         "retrieved_chunks": result_shell["retrieved_chunks"],
+        "retrieval": retrieval_meta,
     }
 
+    t_gen = time.perf_counter()
     parts: list[str] = []
-    async for token in stream_answer(message, docs, summary=summary):
+    async for token in stream_answer(message, docs, summary=summary, history=history):
         parts.append(token)
         yield {"event": "token", "content": token}
+    generation_ms = (time.perf_counter() - t_gen) * 1000
 
     answer = "".join(parts).strip() or NOT_FOUND_MESSAGE
     tokens_used = count_tokens(message) + count_tokens(answer)
-    confidence = result_shell["confidence"]
-    # Recompute with final answer
     from backend.app.rag.qa_chain import compute_confidence
 
     confidence = compute_confidence(docs, answer)
@@ -283,6 +358,20 @@ async def chat_stream(
     session.add(assistant_msg)
     await session.flush()
 
+    timings = {
+        "retrieval_ms": round(retrieval_ms, 2),
+        "generation_ms": round(generation_ms, 2),
+        "total_ms": round((time.perf_counter() - t_total) * 1000, 2),
+    }
+    logger.info(
+        "chat_stream_completed",
+        session_id=chat_session.id,
+        retrieval_ms=timings["retrieval_ms"],
+        generation_ms=timings["generation_ms"],
+        chunks=len(docs),
+        cached=False,
+    )
+
     yield {
         "event": "done",
         "message_id": assistant_msg.id,
@@ -292,6 +381,8 @@ async def chat_stream(
         "confidence": confidence,
         "tokens_used": tokens_used,
         "cached": False,
+        "retrieval": retrieval_meta,
+        "timings": timings,
     }
 
 
@@ -315,11 +406,25 @@ async def admin_stats(session: AsyncSession) -> dict[str, Any]:
     tokens = await session.scalar(
         select(func.coalesce(func.sum(ChatMessage.tokens_used), 0))
     ) or 0
+    answered = await session.scalar(
+        select(func.count())
+        .select_from(ChatMessage)
+        .where(ChatMessage.role == "assistant")
+    ) or 0
+    feedback_up = await session.scalar(
+        select(func.count()).select_from(ChatMessage).where(ChatMessage.rating == "up")
+    ) or 0
+    feedback_down = await session.scalar(
+        select(func.count()).select_from(ChatMessage).where(ChatMessage.rating == "down")
+    ) or 0
     cache = get_cache_stats()
     return {
         "documents": docs,
         "total_sessions": sessions,
         "total_messages": messages,
         "total_tokens_used": tokens,
+        "questions_answered": answered,
+        "feedback_up": feedback_up,
+        "feedback_down": feedback_down,
         **cache,
     }

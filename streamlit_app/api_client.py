@@ -135,6 +135,8 @@ class RagClient:
                 "confidence": result.get("confidence", 0),
                 "tokens_used": result.get("tokens_used", 0),
                 "cached": result.get("cached", False),
+                "retrieval": result.get("retrieval") or {},
+                "timings": result.get("timings") or {},
             }
 
     def rate_message(self, message_id: str, rating: str) -> dict[str, Any]:
@@ -157,6 +159,12 @@ class RagClient:
     def admin_stats(self) -> dict[str, Any]:
         with httpx.Client(timeout=self.timeout) as client:
             r = client.get(self._url("/admin/stats"))
+            r.raise_for_status()
+            return r.json()
+
+    def system_info(self) -> dict[str, Any]:
+        with httpx.Client(timeout=10.0) as client:
+            r = client.get(self._url("/admin/system"))
             r.raise_for_status()
             return r.json()
 

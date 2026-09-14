@@ -31,6 +31,7 @@ class DocumentOut(BaseModel):
     page_count: int
     chunk_count: int
     status: str
+    error_message: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -43,9 +44,17 @@ class DocumentStats(BaseModel):
     indexed_documents: int
 
 
+class IngestStage(BaseModel):
+    name: str
+    ok: bool
+    ms: float = 0.0
+    detail: str = ""
+
+
 class UploadResponse(BaseModel):
     message: str
     documents: list[DocumentOut]
+    stages: list[IngestStage] = []
 
 
 # ---------------------------------------------------------------------------
@@ -78,6 +87,8 @@ class ChatResponse(BaseModel):
     retrieved_chunks: list[SourceCitation]
     tokens_used: int = 0
     cached: bool = False
+    retrieval: dict[str, Any] = Field(default_factory=dict)
+    timings: dict[str, Any] = Field(default_factory=dict)
 
 
 class RateRequest(BaseModel):
@@ -129,6 +140,9 @@ class AdminStats(BaseModel):
     total_tokens_used: int
     cache_hits: int
     cache_misses: int
+    questions_answered: int = 0
+    feedback_up: int = 0
+    feedback_down: int = 0
 
 
 class HealthResponse(BaseModel):
@@ -136,3 +150,24 @@ class HealthResponse(BaseModel):
     app: str
     version: str
     llm_provider: str
+    embedding_provider: str = ""
+    retrieval_strategy: str = "hybrid_rrf"
+
+
+class SystemInfo(BaseModel):
+    app: str
+    version: str
+    llm_provider: str
+    embedding_provider: str
+    local_embedding_model: str
+    openai_chat_model: str
+    llm_temperature: float = 0.1
+    retrieval_strategy: str
+    retriever_top_k: int
+    hybrid_search_weight: float
+    chunk_size: int
+    chunk_overlap: int
+    semantic_cache_enabled: bool
+    semantic_cache_threshold: float
+    max_upload_size_mb: int
+    app_env: str

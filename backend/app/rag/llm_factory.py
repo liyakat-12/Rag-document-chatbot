@@ -8,7 +8,7 @@ from langchain_anthropic import ChatAnthropic
 from langchain_core.embeddings import Embeddings
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage
-from langchain_core.outputs import ChatGeneration, ChatResult
+from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
 from langchain_openai import AzureChatOpenAI, AzureOpenAIEmbeddings, ChatOpenAI, OpenAIEmbeddings
 
 from backend.app.config import Settings, get_settings
@@ -16,11 +16,16 @@ from backend.app.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
+EXTRACTIVE_FALLBACK_PREFIX = (
+    "AI generation is currently unavailable. "
+    "Showing retrieved document information instead.\n\n"
+)
+
 
 class ExtractiveChatModel(BaseChatModel):
     """
-    Offline fallback LLM: returns the most relevant context snippets
-    without calling an external API (useful when OpenAI quota is exhausted).
+    Offline fallback LLM: synthesizes a short answer from the most relevant
+    retrieved snippets without calling an external API.
     """
 
     @property
@@ -47,10 +52,13 @@ class ExtractiveChatModel(BaseChatModel):
         return self._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
 
     def _stream(self, messages, stop=None, run_manager=None, **kwargs):
+        # BaseChatModel expects ChatGenerationChunk (with .message), not bare AIMessageChunk.
         text = self._extract_answer(messages)
         step = max(24, len(text) // 20 or 1)
         for i in range(0, len(text), step):
-            yield AIMessageChunk(content=text[i : i + step])
+            yield ChatGenerationChunk(
+                message=AIMessageChunk(content=text[i : i + step])
+            )
 
     async def _astream(self, messages, stop=None, run_manager=None, **kwargs):
         for chunk in self._stream(messages, stop=stop, run_manager=run_manager, **kwargs):
@@ -65,42 +73,53 @@ class ExtractiveChatModel(BaseChatModel):
             if getattr(m, "type", None) == "human" or m.__class__.__name__ == "HumanMessage":
                 human = str(m.content)
                 break
-        # Prompt contains Context: ... Question: ...
-        if "Context:" in human and "Question:" in human:
+
+        context = ""
+        question = ""
+        # Support both legacy and current prompt layouts
+        if "Document context:" in human and "User question:" in human:
+            ctx = human.split("Document context:", 1)[1]
+            question_part = ctx.split("User question:", 1)
+            context = question_part[0].strip()
+            if len(question_part) > 1:
+                question = question_part[1].split("Write a grounded answer", 1)[0].strip()
+        elif "Context:" in human and "Question:" in human:
             ctx = human.split("Context:", 1)[1]
             question_part = ctx.split("Question:", 1)
             context = question_part[0].strip()
-            question = question_part[1].split("Answer:", 1)[0].strip() if len(question_part) > 1 else ""
+            question = (
+                question_part[1].split("Answer:", 1)[0].strip()
+                if len(question_part) > 1
+                else ""
+            )
         else:
             context = human
             question = ""
 
-        if not context or context == "(none)" or "---" not in context and len(context) < 20:
-            # Still try raw context
-            if len(context.strip()) < 20:
-                return NOT_FOUND_MESSAGE
+        # Prefer only Content: sections from labeled sources
+        content_blocks: list[str] = []
+        for block in context.split("---"):
+            block = block.strip()
+            if "Content:" in block:
+                content_blocks.append(block.split("Content:", 1)[1].strip())
+            elif block:
+                content_blocks.append(block)
 
-        snippets = [s.strip() for s in context.split("---") if s.strip()]
-        if not snippets:
+        if not content_blocks or sum(len(b) for b in content_blocks) < 20:
             return NOT_FOUND_MESSAGE
 
-        # Prefer snippets that share words with the question
         q_words = {w.lower() for w in question.split() if len(w) > 3}
 
         def score(s: str) -> int:
             words = {w.lower() for w in s.split() if len(w) > 3}
             return len(q_words & words)
 
-        ranked = sorted(snippets, key=score, reverse=True)
+        ranked = sorted(content_blocks, key=score, reverse=True)
         top = ranked[:2]
         body = "\n\n".join(top)
-        # Trim overly long extractive answers
         if len(body) > 1800:
             body = body[:1800] + "…"
-        header = (
-            "Based on the uploaded documents (offline extractive mode — "
-            "OpenAI quota unavailable):\n\n"
-        )
+        header = "Offline mode · Extractive answer from retrieved passages:\n\n"
         return header + body
 
 
@@ -108,6 +127,7 @@ def get_chat_llm(settings: Settings | None = None, streaming: bool = False) -> B
     """Return a chat LLM based on configured provider."""
     settings = settings or get_settings()
     provider = settings.llm_provider
+    temperature = float(getattr(settings, "llm_temperature", 0.1) or 0.1)
 
     if provider == "extractive":
         return ExtractiveChatModel()
@@ -119,7 +139,7 @@ def get_chat_llm(settings: Settings | None = None, streaming: bool = False) -> B
             api_key=settings.openai_api_key,
             base_url=settings.openai_api_base,
             model=settings.openai_chat_model,
-            temperature=0.0,
+            temperature=temperature,
             streaming=streaming,
         )
 
@@ -131,7 +151,7 @@ def get_chat_llm(settings: Settings | None = None, streaming: bool = False) -> B
             azure_endpoint=settings.azure_openai_endpoint,
             api_version=settings.azure_openai_api_version,
             azure_deployment=settings.azure_openai_chat_deployment,
-            temperature=0.0,
+            temperature=temperature,
             streaming=streaming,
         )
 
@@ -141,7 +161,7 @@ def get_chat_llm(settings: Settings | None = None, streaming: bool = False) -> B
         return ChatAnthropic(
             api_key=settings.anthropic_api_key,
             model=settings.anthropic_chat_model,
-            temperature=0.0,
+            temperature=temperature,
             streaming=streaming,
         )
 
@@ -172,7 +192,6 @@ def get_embeddings(settings: Settings | None = None) -> Embeddings:
             "base_url": settings.openai_api_base,
             "model": settings.openai_embedding_model,
         }
-        # dimensions only supported by some OpenAI embedding models
         if "text-embedding-3" in settings.openai_embedding_model:
             kwargs["dimensions"] = settings.embedding_dimensions
         return OpenAIEmbeddings(**kwargs)

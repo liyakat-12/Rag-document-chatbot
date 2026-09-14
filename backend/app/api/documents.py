@@ -55,13 +55,15 @@ async def upload_documents(
     _ensure_api_key_configured()
     settings = get_settings()
     documents = []
+    all_stages: list = []
     try:
         for file in files:
             raw = await validate_pdf_upload(file)
-            doc = await document_service.save_and_index_pdf(
+            doc, stages = await document_service.save_and_index_pdf(
                 db, raw, file.filename or "document.pdf", settings.upload_path
             )
             documents.append(DocumentOut.model_validate(doc))
+            all_stages.extend(stages)
     except AuthenticationError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -91,6 +93,7 @@ async def upload_documents(
     return UploadResponse(
         message=f"Successfully uploaded and indexed {len(documents)} document(s).",
         documents=documents,
+        stages=all_stages,
     )
 
 

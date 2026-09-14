@@ -1,0 +1,30 @@
+{
+  "description": "Small grounded Q&A set for DocuMind retrieval evaluation. Prefer questions answerable from a typical resume/CV PDF.",
+  "cases": [
+    {
+      "id": "name",
+      "question": "What is the candidate's name?",
+      "expected_answer_contains": ["Liyakat"],
+      "relevant_keywords": ["Liyakat", "Hussain", "name"]
+    },
+    {
+      "id": "skills",
+      "question": "What skills and technologies are mentioned?",
+      "expected_answer_contains": ["Python"],
+      "relevant_keywords": ["Python", "SQL", "skills"]
+    },
+    {
+      "id": "summary",
+      "question": "Summarize the key points of the document.",
+      "expected_answer_contains": [],
+      "relevant_keywords": ["experience", "data", "project"]
+    },
+    {
+      "id": "unanswerable",
+      "question": "What is the company's Q3 revenue in 2019?",
+      "expected_answer_contains": ["couldn't find"],
+      "relevant_keywords": [],
+      "expect_not_found": true
+    }
+  ]
+}

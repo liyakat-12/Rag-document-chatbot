@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
+from typing import Any
 from uuid import uuid4
 
 from langchain_core.documents import Document as LCDocument
@@ -20,8 +22,18 @@ from backend.app.rag.vector_store import (
 )
 from backend.app.utils.logging import get_logger
 from backend.app.utils.security import sanitize_filename
+from backend.app.utils.text import clean_text
 
 logger = get_logger(__name__)
+
+
+def _stage(name: str, ok: bool, ms: float, detail: str = "") -> dict[str, Any]:
+    return {
+        "name": name,
+        "ok": ok,
+        "ms": round(ms, 2),
+        "detail": detail,
+    }
 
 
 async def save_and_index_pdf(
@@ -29,13 +41,23 @@ async def save_and_index_pdf(
     raw_bytes: bytes,
     original_filename: str,
     upload_dir: Path,
-) -> Document:
-    """Persist a PDF to disk, parse, chunk, embed, and store in FAISS."""
+) -> tuple[Document, list[dict[str, Any]]]:
+    """
+    Persist a PDF to disk, parse, chunk, embed, and store in FAISS + BM25.
+
+    Returns (document, pipeline_stages) where stages reflect work that actually ran.
+    """
+    stages: list[dict[str, Any]] = []
+    t_all = time.perf_counter()
+
     safe_name = sanitize_filename(original_filename)
     doc_id = str(uuid4())
     stored_name = f"{doc_id}_{safe_name}"
     file_path = upload_dir / stored_name
+
+    t0 = time.perf_counter()
     file_path.write_bytes(raw_bytes)
+    stages.append(_stage("uploaded", True, (time.perf_counter() - t0) * 1000, f"{len(raw_bytes)} bytes"))
 
     document = Document(
         id=doc_id,
@@ -49,9 +71,39 @@ async def save_and_index_pdf(
     await session.flush()
 
     try:
+        t0 = time.perf_counter()
         pages = load_pdf(file_path)
+        if not pages:
+            raise ValueError("PDF contains no extractable text pages.")
         document.page_count = len(pages)
+        stages.append(
+            _stage(
+                "extracted",
+                True,
+                (time.perf_counter() - t0) * 1000,
+                f"{len(pages)} page(s)",
+            )
+        )
+
+        t0 = time.perf_counter()
+        # clean_text runs inside split/load path; measure explicit clean of page text
+        cleaned_chars = sum(len(clean_text(p.page_content or "")) for p in pages)
+        stages.append(
+            _stage(
+                "cleaned",
+                True,
+                (time.perf_counter() - t0) * 1000,
+                f"{cleaned_chars} characters",
+            )
+        )
+
+        t0 = time.perf_counter()
         chunks = split_documents(pages, document_id=doc_id, filename=original_filename)
+        if not chunks:
+            raise ValueError("No text chunks could be created from this PDF.")
+        stages.append(
+            _stage("chunked", True, (time.perf_counter() - t0) * 1000, f"{len(chunks)} chunks")
+        )
 
         chunk_rows: list[DocumentChunk] = []
         for chunk in chunks:
@@ -67,23 +119,43 @@ async def save_and_index_pdf(
             )
         session.add_all(chunk_rows)
 
+        t0 = time.perf_counter()
         faiss_ids = add_documents(chunks)
         for row, fid in zip(chunk_rows, faiss_ids):
-            row.faiss_id = hash(fid) % (10**9)  # store compact int ref
+            row.faiss_id = hash(fid) % (10**9)
+        stages.append(
+            _stage(
+                "embedded_faiss",
+                True,
+                (time.perf_counter() - t0) * 1000,
+                f"{len(faiss_ids)} vectors",
+            )
+        )
+
+        t0 = time.perf_counter()
+        rebuild_bm25_index()
+        stages.append(_stage("bm25_updated", True, (time.perf_counter() - t0) * 1000))
 
         document.chunk_count = len(chunks)
         document.status = "indexed"
-        rebuild_bm25_index()
-        logger.info("document_indexed", document_id=doc_id, chunks=len(chunks))
+        total_ms = (time.perf_counter() - t_all) * 1000
+        logger.info(
+            "document_indexed",
+            document_id=doc_id,
+            pages=document.page_count,
+            chunks=len(chunks),
+            total_ms=round(total_ms, 2),
+        )
     except Exception as exc:
         document.status = "error"
         document.error_message = str(exc)
+        stages.append(_stage("failed", False, 0, str(exc)[:200]))
         logger.error("document_index_failed", document_id=doc_id, error=str(exc))
         raise
 
     await session.flush()
     await session.refresh(document)
-    return document
+    return document, stages
 
 
 async def list_documents(session: AsyncSession) -> list[Document]:
@@ -127,7 +199,6 @@ async def reindex_all(session: AsyncSession) -> tuple[int, int]:
             document.error_message = "File missing on disk"
             continue
         try:
-            # Clear old chunks
             for ch in list(document.chunks):
                 await session.delete(ch)
             await session.flush()

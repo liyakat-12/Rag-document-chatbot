@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     )
 
     # Application
-    app_name: str = "RAG Document Chatbot"
+    app_name: str = "DocuMind AI"
     app_env: Literal["development", "staging", "production"] = "development"
     debug: bool = True
     log_level: str = "INFO"
@@ -41,6 +41,8 @@ class Settings(BaseSettings):
     openai_api_base: str = "https://api.openai.com/v1"
     openai_chat_model: str = "gpt-4o-mini"
     openai_embedding_model: str = "text-embedding-3-small"
+    # Low temperature preferred for factual document QA
+    llm_temperature: float = 0.1
 
     azure_openai_api_key: str = ""
     azure_openai_endpoint: str = ""
