@@ -1,0 +1,579 @@
+{
+  "generated_at": "2026-11-12T14:35:36.460453+00:00",
+  "git_commit": "124c060231ec0450dbf68625b216f1cbcd2cb2bd",
+  "config": {
+    "name": "default",
+    "description": "Current production hybrid RRF settings (frozen for Phase 1 tooling).",
+    "retriever_top_k": 4,
+    "span_min_overlap": 0.5,
+    "llm_provider": "extractive",
+    "embedding_provider": "local",
+    "hybrid_search_weight": 0.5,
+    "chunk_size": 1000,
+    "chunk_overlap": 200
+  },
+  "corpus_hash": "3eca4ae9ce9177a4aa450637ced7c55beff0a0065efa5426f9c34d1103d1803d",
+  "chunking_config_hash": "b8896eef7baf7acb",
+  "eval_index_path": "C:\\Users\\imabb\\RAG_Document_Chatbot\\evals\\.index\\3eca4ae9ce9177a4_b8896eef7baf7acb",
+  "split": "tune",
+  "verified_only": false,
+  "n_questions": 32,
+  "n_human_verified": 0,
+  "n_draft": 32,
+  "questions_path": "C:\\Users\\imabb\\RAG_Document_Chatbot\\evals\\data\\questions.jsonl",
+  "indexed_chunks": 40,
+  "uses_app_index": false,
+  "skipped": false,
+  "metrics": {
+    "Recall@1": 0.5416666666666666,
+    "Recall@4": 0.9166666666666666,
+    "Precision@4": 0.2708333333333333,
+    "MRR": 0.6909722222222223,
+    "hit_rate": 0.9166666666666666,
+    "not_found_accuracy": 0.75,
+    "refusal_precision": null,
+    "refusal_recall": 0.0,
+    "false_refusal_rate": 0.0,
+    "key_fact_coverage": null,
+    "latency": {
+      "count": 32,
+      "p50_ms": 19.6,
+      "p95_ms": 25.06,
+      "avg_ms": 19.7
+    },
+    "notes": {
+      "retrieval_only": "Scores retrieval on the isolated eval index built from evals/corpus/. Does not use the app FAISS/BM25 or SQLite.",
+      "label_integrity": "Draft labels are unverified. Headline claims require label_source=human_verified and verified_only=true."
+    }
+  },
+  "cases": [
+    {
+      "id": "factual_grace_name",
+      "category": "factual",
+      "answerable": true,
+      "label_source": "draft",
+      "relevant_ranks": [
+        1
+      ],
+      "recall_at_1": 1.0,
+      "recall_at_4": 1.0,
+      "mrr": 1.0,
+      "n_results": 4,
+      "refused_empty_retrieval": false,
+      "latency_ms": 25.06,
+      "faiss_ms": 15.4,
+      "bm25_ms": 0.35
+    },
+    {
+      "id": "paraphrase_hybrid_topic",
+      "category": "paraphrase",
+      "answerable": true,
+      "label_source": "draft",
+      "relevant_ranks": [
+        1
+      ],
+      "recall_at_1": 1.0,
+      "recall_at_4": 1.0,
+      "mrr": 1.0,
+      "n_results": 4,
+      "refused_empty_retrieval": false,
+      "latency_ms": 17.15,
+      "faiss_ms": 15.33,
+      "bm25_ms": 0.28
+    },
+    {
+      "id": "paraphrase_parental",
+      "category": "paraphrase",
+      "answerable": true,
+      "label_source": "draft",
+      "relevant_ranks": [
+        4
+      ],
+      "recall_at_1": 0.0,
+      "recall_at_4": 1.0,
+      "mrr": 0.25,
+      "n_results": 4,
+      "refused_empty_retrieval": false,
+      "latency_ms": 18.45,
+      "faiss_ms": 16.71,
+      "bm25_ms": 0.56
+    },
+    {
+      "id": "table_annual_used",
+      "category": "table",
+      "answerable": true,
+      "label_source": "draft",
+      "relevant_ranks": [
+        1
+      ],
+      "recall_at_1": 1.0,
+      "recall_at_4": 1.0,
+      "mrr": 1.0,
+      "n_results": 4,
+      "refused_empty_retrieval": false,
+      "latency_ms": 24.31,
+      "faiss_ms": 22.94,
+      "bm25_ms": 0.25
+    },
+    {
+      "id": "table_sick_entitlement_row",
+      "category": "table",
+      "answerable": true,
+      "label_source": "draft",
+      "relevant_ranks": [
+        1
+      ],
+      "recall_at_1": 1.0,
+      "recall_at_4": 1.0,
+      "mrr": 1.0,
+      "n_results": 4,
+      "refused_empty_retrieval": false,
+      "latency_ms": 21.65,
+      "faiss_ms": 20.34,
+      "bm25_ms": 0.34
+    },
+    {
+      "id": "exact_mgr_code",
+      "category": "exact_identifier",
+      "answerable": true,
+      "label_source": "draft",
+      "relevant_ranks": [
+        1
+      ],
+      "recall_at_1": 1.0,
+      "recall_at_4": 1.0,
+      "mrr": 1.0,
+      "n_results": 4,
+      "refused_empty_retrieval": false,
+      "latency_ms": 20.5,
+      "faiss_ms": 18.87,
+      "bm25_ms": 0.32
+    },
+    {
+      "id": "factual_dmapi_5007",
+      "category": "factual",
+      "answerable": true,
+      "label_source": "draft",
+      "relevant_ranks": [
+        1
+      ],
+      "recall_at_1": 1.0,
+      "recall_at_4": 1.0,
+      "mrr": 1.0,
+      "n_results": 4,
+      "refused_empty_retrieval": false,
+      "latency_ms": 20.56,
+      "faiss_ms": 18.88,
+      "bm25_ms": 0.18
+    },
+    {
+      "id": "disamb_amgf_ter",
+      "category": "number_or_date",
+      "answerable": true,
+      "label_source": "draft",
+      "relevant_ranks": [
+        1
+      ],
+      "recall_at_1": 1.0,
+      "recall_at_4": 1.0,
+      "mrr": 1.0,
+      "n_results": 4,
+      "refused_empty_retrieval": false,
+      "latency_ms": 33.7,
+      "faiss_ms": 31.82,
+      "bm25_ms": 0.38
+    },
+    {
+      "id": "disamb_bfcf_ter",
+      "category": "number_or_date",
+      "answerable": true,
+      "label_source": "draft",
+      "relevant_ranks": [
+        4
+      ],
+      "recall_at_1": 0.0,
+      "recall_at_4": 1.0,
+      "mrr": 0.25,
+      "n_results": 4,
+      "refused_empty_retrieval": false,
+      "latency_ms": 20.51,
+      "faiss_ms": 19.18,
+      "bm25_ms": 0.37
+    },
+    {
+      "id": "disamb_cldf_ter",
+      "category": "number_or_date",
+      "answerable": true,
+      "label_source": "draft",
+      "relevant_ranks": [
+        2
+      ],
+      "recall_at_1": 0.0,
+      "recall_at_4": 1.0,
+      "mrr": 0.5,
+      "n_results": 4,
+      "refused_empty_retrieval": false,
+      "latency_ms": 18.36,
+      "faiss_ms": 17.31,
+      "bm25_ms": 0.29
+    },
+    {
+      "id": "disamb_amgf_d_isin",
+      "category": "exact_identifier",
+      "answerable": true,
+      "label_source": "draft",
+      "relevant_ranks": [
+        2
+      ],
+      "recall_at_1": 0.0,
+      "recall_at_4": 1.0,
+      "mrr": 0.5,
+      "n_results": 4,
+      "refused_empty_retrieval": false,
+      "latency_ms": 19.05,
+      "faiss_ms": 17.25,
+      "bm25_ms": 0.57
+    },
+    {
+      "id": "disamb_cldf_isin",
+      "category": "exact_identifier",
+      "answerable": true,
+      "label_source": "draft",
+      "relevant_ranks": [
+        1
+      ],
+      "recall_at_1": 1.0,
+      "recall_at_4": 1.0,
+      "mrr": 1.0,
+      "n_results": 4,
+      "refused_empty_retrieval": false,
+      "latency_ms": 17.86,
+      "faiss_ms": 16.58,
+      "bm25_ms": 0.28
+    },
+    {
+      "id": "disamb_cldf_aum",
+      "category": "number_or_date",
+      "answerable": true,
+      "label_source": "draft",
+      "relevant_ranks": [
+        1
+      ],
+      "recall_at_1": 1.0,
+      "recall_at_4": 1.0,
+      "mrr": 1.0,
+      "n_results": 4,
+      "refused_empty_retrieval": false,
+      "latency_ms": 23.36,
+      "faiss_ms": 20.71,
+      "bm25_ms": 0.54
+    },
+    {
+      "id": "disamb_amgf_code",
+      "category": "exact_identifier",
+      "answerable": true,
+      "label_source": "draft",
+      "relevant_ranks": [
+        2
+      ],
+      "recall_at_1": 0.0,
+      "recall_at_4": 1.0,
+      "mrr": 0.5,
+      "n_results": 4,
+      "refused_empty_retrieval": false,
+      "latency_ms": 26.94,
+      "faiss_ms": 23.88,
+      "bm25_ms": 0.47
+    },
+    {
+      "id": "disamb_amgf_risk",
+      "category": "factual",
+      "answerable": true,
+      "label_source": "draft",
+      "relevant_ranks": [],
+      "recall_at_1": 0.0,
+      "recall_at_4": 0.0,
+      "mrr": 0.0,
+      "n_results": 4,
+      "refused_empty_retrieval": false,
+      "latency_ms": 22.87,
+      "faiss_ms": 21.07,
+      "bm25_ms": 0.38
+    },
+    {
+      "id": "disamb_amgf_d_aum",
+      "category": "number_or_date",
+      "answerable": true,
+      "label_source": "draft",
+      "relevant_ranks": [
+        4
+      ],
+      "recall_at_1": 0.0,
+      "recall_at_4": 1.0,
+      "mrr": 0.25,
+      "n_results": 4,
+      "refused_empty_retrieval": false,
+      "latency_ms": 22.6,
+      "faiss_ms": 21.28,
+      "bm25_ms": 0.29
+    },
+    {
+      "id": "md_aurora_ters",
+      "category": "multi_document",
+      "answerable": true,
+      "label_source": "draft",
+      "relevant_ranks": [
+        1,
+        3
+      ],
+      "recall_at_1": 1.0,
+      "recall_at_4": 1.0,
+      "mrr": 1.0,
+      "n_results": 4,
+      "refused_empty_retrieval": false,
+      "latency_ms": 19.6,
+      "faiss_ms": 18.27,
+      "bm25_ms": 0.3
+    },
+    {
+      "id": "md_cldf_plans_ter",
+      "category": "multi_document",
+      "answerable": true,
+      "label_source": "draft",
+      "relevant_ranks": [
+        2,
+        4
+      ],
+      "recall_at_1": 0.0,
+      "recall_at_4": 1.0,
+      "mrr": 0.5,
+      "n_results": 4,
+      "refused_empty_retrieval": false,
+      "latency_ms": 20.58,
+      "faiss_ms": 19.57,
+      "bm25_ms": 0.36
+    },
+    {
+      "id": "mh_bfcf_gap",
+      "category": "multi_hop",
+      "answerable": true,
+      "label_source": "draft",
+      "relevant_ranks": [
+        1,
+        3
+      ],
+      "recall_at_1": 1.0,
+      "recall_at_4": 1.0,
+      "mrr": 1.0,
+      "n_results": 4,
+      "refused_empty_retrieval": false,
+      "latency_ms": 20.06,
+      "faiss_ms": 19.06,
+      "bm25_ms": 0.3
+    },
+    {
+      "id": "mh_cldf_not_equity",
+      "category": "multi_hop",
+      "answerable": true,
+      "label_source": "draft",
+      "relevant_ranks": [
+        1
+      ],
+      "recall_at_1": 1.0,
+      "recall_at_4": 1.0,
+      "mrr": 1.0,
+      "n_results": 4,
+      "refused_empty_retrieval": false,
+      "latency_ms": 20.06,
+      "faiss_ms": 18.98,
+      "bm25_ms": 0.32
+    },
+    {
+      "id": "amb_ter_aurora",
+      "category": "ambiguous",
+      "answerable": true,
+      "label_source": "draft",
+      "relevant_ranks": [
+        3,
+        4
+      ],
+      "recall_at_1": 0.0,
+      "recall_at_4": 1.0,
+      "mrr": 0.3333333333333333,
+      "n_results": 4,
+      "refused_empty_retrieval": false,
+      "latency_ms": 15.28,
+      "faiss_ms": 14.27,
+      "bm25_ms": 0.24
+    },
+    {
+      "id": "amb_boreal_aum",
+      "category": "ambiguous",
+      "answerable": true,
+      "label_source": "draft",
+      "relevant_ranks": [],
+      "recall_at_1": 0.0,
+      "recall_at_4": 0.0,
+      "mrr": 0.0,
+      "n_results": 4,
+      "refused_empty_retrieval": false,
+      "latency_ms": 18.32,
+      "faiss_ms": 17.35,
+      "bm25_ms": 0.26
+    },
+    {
+      "id": "paraphrase_soft_closure",
+      "category": "paraphrase",
+      "answerable": true,
+      "label_source": "draft",
+      "relevant_ranks": [
+        2
+      ],
+      "recall_at_1": 0.0,
+      "recall_at_4": 1.0,
+      "mrr": 0.5,
+      "n_results": 4,
+      "refused_empty_retrieval": false,
+      "latency_ms": 18.56,
+      "faiss_ms": 17.01,
+      "bm25_ms": 0.56
+    },
+    {
+      "id": "table_invoice_tax_rate_row",
+      "category": "table",
+      "answerable": true,
+      "label_source": "draft",
+      "relevant_ranks": [
+        1
+      ],
+      "recall_at_1": 1.0,
+      "recall_at_4": 1.0,
+      "mrr": 1.0,
+      "n_results": 4,
+      "refused_empty_retrieval": false,
+      "latency_ms": 15.22,
+      "faiss_ms": 13.93,
+      "bm25_ms": 0.29
+    },
+    {
+      "id": "ood_mars",
+      "category": "unanswerable_out_of_domain",
+      "answerable": false,
+      "label_source": "draft",
+      "relevant_ranks": [],
+      "recall_at_1": null,
+      "recall_at_4": null,
+      "mrr": null,
+      "n_results": 4,
+      "refused_empty_retrieval": false,
+      "latency_ms": 15.02,
+      "faiss_ms": 14.05,
+      "bm25_ms": 0.24
+    },
+    {
+      "id": "ood_cricket",
+      "category": "unanswerable_out_of_domain",
+      "answerable": false,
+      "label_source": "draft",
+      "relevant_ranks": [],
+      "recall_at_1": null,
+      "recall_at_4": null,
+      "mrr": null,
+      "n_results": 4,
+      "refused_empty_retrieval": false,
+      "latency_ms": 19.89,
+      "faiss_ms": 18.86,
+      "bm25_ms": 0.25
+    },
+    {
+      "id": "ood_movie",
+      "category": "unanswerable_out_of_domain",
+      "answerable": false,
+      "label_source": "draft",
+      "relevant_ranks": [],
+      "recall_at_1": null,
+      "recall_at_4": null,
+      "mrr": null,
+      "n_results": 4,
+      "refused_empty_retrieval": false,
+      "latency_ms": 15.06,
+      "faiss_ms": 14.06,
+      "bm25_ms": 0.24
+    },
+    {
+      "id": "near_amgf_d_exit_diff",
+      "category": "unanswerable_near_miss",
+      "answerable": false,
+      "label_source": "draft",
+      "relevant_ranks": [],
+      "recall_at_1": null,
+      "recall_at_4": null,
+      "mrr": null,
+      "n_results": 4,
+      "refused_empty_retrieval": false,
+      "latency_ms": 15.77,
+      "faiss_ms": 14.68,
+      "bm25_ms": 0.3
+    },
+    {
+      "id": "near_aurora_ter_in_circular",
+      "category": "unanswerable_near_miss",
+      "answerable": false,
+      "label_source": "draft",
+      "relevant_ranks": [],
+      "recall_at_1": null,
+      "recall_at_4": null,
+      "mrr": null,
+      "n_results": 4,
+      "refused_empty_retrieval": false,
+      "latency_ms": 17.04,
+      "faiss_ms": 15.71,
+      "bm25_ms": 0.36
+    },
+    {
+      "id": "near_amgf_manager_priya",
+      "category": "unanswerable_near_miss",
+      "answerable": false,
+      "label_source": "draft",
+      "relevant_ranks": [],
+      "recall_at_1": null,
+      "recall_at_4": null,
+      "mrr": null,
+      "n_results": 4,
+      "refused_empty_retrieval": false,
+      "latency_ms": 15.09,
+      "faiss_ms": 14.02,
+      "bm25_ms": 0.3
+    },
+    {
+      "id": "near_invoice_iban",
+      "category": "unanswerable_near_miss",
+      "answerable": false,
+      "label_source": "draft",
+      "relevant_ranks": [],
+      "recall_at_1": null,
+      "recall_at_4": null,
+      "mrr": null,
+      "n_results": 4,
+      "refused_empty_retrieval": false,
+      "latency_ms": 16.53,
+      "faiss_ms": 15.61,
+      "bm25_ms": 0.2
+    },
+    {
+      "id": "near_cldf_equity_allocation",
+      "category": "unanswerable_near_miss",
+      "answerable": false,
+      "label_source": "draft",
+      "relevant_ranks": [],
+      "recall_at_1": null,
+      "recall_at_4": null,
+      "mrr": null,
+      "n_results": 4,
+      "refused_empty_retrieval": false,
+      "latency_ms": 15.41,
+      "faiss_ms": 13.55,
+      "bm25_ms": 0.33
+    }
+  ]
+}
