@@ -1,8 +1,9 @@
-# Evaluation corpus
+# Evaluation corpus (public / reproducible)
 
-**10 documents** are used for Phase 1 draft labeling (see `manifest.json` for hashes).
+Only documents that can be **committed** or fetched via `download_corpus.py` belong here.
+Personal resumes and unclear-licence reports were removed in the Phase 1 fixes.
 
-## Committed fixtures (safe to share)
+## Committed fixtures
 
 | File | Purpose |
 |------|---------|
@@ -13,30 +14,20 @@
 | `_smoke_perf.pdf` | Tiny resume (Grace Hopper) |
 | `qa_design.pdf` | Hybrid / RRF fact |
 
-## Local-only (gitignored — keep on disk for draft spans)
+## Adding more public PDFs
 
-| File | Notes |
-|------|--------|
-| `Liyakat_*.pdf` | Personal resumes — do not publish without consent |
-| `MediAssist_*.pdf` | Student project report — licence unclear for redistribution |
-| `deepfake_*.pdf` | Study notes — licence unclear |
-
-After adding or removing files:
+1. Copy a redistributable PDF into this folder **or** add a URL to `download_corpus.py`.
+2. Run `python evals/corpus/download_corpus.py` if using downloads.
+3. Regenerate the manifest:
 
 ```bash
 python -c "from evals.corpus_util import write_manifest; print(write_manifest())"
 ```
 
-Regenerate extract cache (optional, for drafting):
+4. Draft or extend questions (`evals/data/_rebuild_public_questions.py` or manually),
+   then verify with `python -m evals.label`.
 
-```bash
-python -c "from pathlib import Path; import json; from langchain_community.document_loaders import PyPDFLoader; ..."
-```
+## Isolated index
 
-or re-run `evals/data/_draft_questions.py` only after `_extracted_pages.json` exists.
-
-## Rules
-
-- Prefer files you have rights to use in a portfolio.
-- Unclear-licence files must not be committed; list them in `manifest.json` with origin notes.
-- Evaluation runner hashes whatever files are present on disk (`corpus_hash`).
+Evaluation builds FAISS+BM25 under `evals/.index/` (gitignored) from this folder only.
+It never reads the app `vector_store/` or SQLite database.

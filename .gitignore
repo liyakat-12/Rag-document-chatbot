@@ -44,12 +44,14 @@ htmlcov/
 .pytest_cache/
 evals/last_report.json
 
-# Eval corpus: keep fixtures; ignore personal/unclear-licence PDFs + extract cache
+# Eval corpus: keep public fixtures; never commit personal PDFs or extract cache
 evals/corpus/_extracted_pages.json
+evals/corpus/_build_corpus.py
 evals/corpus/Liyakat_*.pdf
 evals/corpus/MediAssist_*.pdf
 evals/corpus/deepfake_*.pdf
-evals/corpus/_build_corpus.py
+# Isolated evaluation FAISS/BM25 caches
+evals/.index/
 
 # Local smoke artifacts
 uploads/_smoke_*

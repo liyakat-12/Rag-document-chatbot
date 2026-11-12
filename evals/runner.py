@@ -1,8 +1,4 @@
-"""Evaluation runner: retrieve against live index, score with gold spans, write results.
-
-Does not invent metrics. If the question file is empty or the vector store is empty,
-writes a results file that records the skip reason.
-"""
+"""Evaluation runner against the isolated eval index (never the live app index)."""
 
 from __future__ import annotations
 
@@ -11,13 +7,13 @@ import subprocess
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from evals.corpus_util import corpus_hash
+from evals.eval_index import build_or_load_eval_index, search_eval_index
 from evals.metrics import (
     false_refusal_rate,
     hit_rate,
-    key_fact_coverage,
     latency_summary,
     mrr,
     not_found_accuracy,
@@ -28,7 +24,7 @@ from evals.metrics import (
     refusal_precision,
     refusal_recall,
 )
-from evals.schema import Question, filter_questions, load_questions
+from evals.schema import filter_questions, load_questions
 from evals.span_map import GoldSpan, ranks_of_relevant
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -59,16 +55,14 @@ def load_config(name_or_path: str) -> dict[str, Any]:
             "retriever_top_k": 4,
             "span_min_overlap": 0.5,
             "llm_provider": "extractive",
+            "chunk_size": 1000,
+            "chunk_overlap": 200,
+            "embedding_provider": "local",
+            "hybrid_search_weight": 0.5,
         }
     data = json.loads(path.read_text(encoding="utf-8"))
     data.setdefault("name", path.stem)
     return data
-
-
-def _run_retrieval(query: str, top_k: int, document_ids: Optional[list[str]] = None):
-    from backend.app.rag.hybrid_search import hybrid_search_detailed
-
-    return hybrid_search_detailed(query, k=top_k, document_ids=document_ids)
 
 
 def evaluate(
@@ -87,18 +81,26 @@ def evaluate(
     )
     n_verified = sum(1 for q in questions if q.label_source == "human_verified")
     n_draft = sum(1 for q in questions if q.label_source == "draft")
+    c_hash = corpus_hash()
+
+    # Build/load isolated index BEFORE any retrieval (never touches app FAISS)
+    eval_index = build_or_load_eval_index(config)
 
     meta: dict[str, Any] = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "git_commit": git_commit_hash(),
         "config": config,
-        "corpus_hash": corpus_hash(),
+        "corpus_hash": c_hash,
+        "chunking_config_hash": eval_index.chunking_config_hash,
+        "eval_index_path": str(eval_index.path),
         "split": split,
         "verified_only": verified_only,
         "n_questions": len(questions),
         "n_human_verified": n_verified,
         "n_draft": n_draft,
         "questions_path": str(questions_path),
+        "indexed_chunks": eval_index.n_chunks,
+        "uses_app_index": False,
     }
 
     if not questions:
@@ -111,17 +113,11 @@ def evaluate(
         }
         return _write(report, out_dir, config.get("name", config_name), split)
 
-    # Vector store check
-    from backend.app.rag.vector_store import get_vector_store
-
-    store = get_vector_store()
-    n_chunks = len(getattr(store.docstore, "_dict", {}) or {})
-    meta["indexed_chunks"] = n_chunks
-    if n_chunks == 0:
+    if eval_index.n_chunks == 0:
         report = {
             **meta,
             "skipped": True,
-            "reason": "empty vector store — index the eval corpus before running",
+            "reason": "empty eval corpus index — add PDFs under evals/corpus/",
             "metrics": {},
             "cases": [],
         }
@@ -129,22 +125,27 @@ def evaluate(
 
     top_k = int(config.get("retriever_top_k", 4))
     min_overlap = float(config.get("span_min_overlap", 0.5))
+    dense_w = float(config.get("hybrid_search_weight", 0.5))
 
     cases: list[dict[str, Any]] = []
     recall1: list[float] = []
     recall4: list[float] = []
-    recall_k: list[float] = []
+    recall_k_vals: list[float] = []
     prec4: list[float] = []
     mrrs: list[float] = []
     hits: list[bool] = []
     pred_refuse: list[bool] = []
     gold_unans: list[bool] = []
-    key_cov: list[float] = []
     latencies: list[float] = []
 
     for q in questions:
         t0 = time.perf_counter()
-        detailed = _run_retrieval(q.query, top_k=top_k)
+        detailed = search_eval_index(
+            eval_index,
+            q.query,
+            top_k=top_k,
+            dense_weight=dense_w,
+        )
         ms = (time.perf_counter() - t0) * 1000
         latencies.append(ms)
 
@@ -153,8 +154,6 @@ def evaluate(
             detailed.results,
             min_overlap=min_overlap,
         )
-        # Refusal proxy for retrieval-only phase: empty results ⇒ refuse.
-        # Full not_found labelling belongs to Phase 2 answer path.
         refused = len(detailed.results) == 0
         pred_refuse.append(refused)
         gold_unans.append(not q.answerable)
@@ -169,12 +168,11 @@ def evaluate(
         if q.answerable:
             recall1.append(r1)
             recall4.append(r4)
-            recall_k.append(rk)
+            recall_k_vals.append(rk)
             prec4.append(p4)
             mrrs.append(mr)
             hits.append(hit)
 
-        # key facts require an answer string — retrieval-only run leaves N/A
         cases.append(
             {
                 "id": q.id,
@@ -188,8 +186,8 @@ def evaluate(
                 "n_results": len(detailed.results),
                 "refused_empty_retrieval": refused,
                 "latency_ms": round(ms, 2),
-                "faiss_ms": (detailed.details.get("semantic") or {}).get("latency_ms"),
-                "bm25_ms": (detailed.details.get("bm25") or {}).get("latency_ms"),
+                "faiss_ms": detailed.details.get("faiss_ms"),
+                "bm25_ms": detailed.details.get("bm25_ms"),
             }
         )
 
@@ -199,7 +197,7 @@ def evaluate(
     metrics = {
         "Recall@1": _avg(recall1),
         "Recall@4": _avg(recall4),
-        f"Recall@{top_k}": _avg(recall_k),
+        f"Recall@{top_k}": _avg(recall_k_vals),
         "Precision@4": _avg(prec4),
         "MRR": _avg(mrrs),
         "hit_rate": hit_rate(hits) if hits else None,
@@ -207,13 +205,12 @@ def evaluate(
         "refusal_precision": refusal_precision(pred_refuse, gold_unans),
         "refusal_recall": refusal_recall(pred_refuse, gold_unans),
         "false_refusal_rate": false_refusal_rate(pred_refuse, gold_unans),
-        "key_fact_coverage": None,  # requires answer generation — Phase 2+
+        "key_fact_coverage": None,
         "latency": latency_summary(latencies),
         "notes": {
             "retrieval_only": (
-                "This run scores retrieval against gold spans. "
-                "Refusal metrics use empty-retrieval as a proxy; "
-                "answer-path refusal is Phase 2."
+                "Scores retrieval on the isolated eval index built from evals/corpus/. "
+                "Does not use the app FAISS/BM25 or SQLite."
             ),
             "label_integrity": (
                 "Draft labels are unverified. Headline claims require "
@@ -237,7 +234,6 @@ def _write(report: dict[str, Any], out_dir: Path | str, config_name: str, split:
     date = datetime.now(timezone.utc).strftime("%Y%m%d")
     json_path = out / f"{date}_{config_name}_{split}.json"
     json_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
-
     md_path = out / f"{date}_{config_name}_{split}.md"
     md_path.write_text(_markdown_summary(report, json_path), encoding="utf-8")
     report["results_json"] = str(json_path)
@@ -253,6 +249,9 @@ def _markdown_summary(report: dict[str, Any], json_path: Path) -> str:
         f"- Generated: `{report.get('generated_at')}`",
         f"- Git commit: `{report.get('git_commit')}`",
         f"- Corpus hash: `{report.get('corpus_hash')}`",
+        f"- Chunking config hash: `{report.get('chunking_config_hash')}`",
+        f"- Eval index: `{report.get('eval_index_path')}`",
+        f"- Uses app index: `{report.get('uses_app_index')}`",
         f"- Split: `{report.get('split')}`",
         f"- Questions: {report.get('n_questions')} "
         f"(human_verified={report.get('n_human_verified')}, draft={report.get('n_draft')})",
@@ -264,12 +263,7 @@ def _markdown_summary(report: dict[str, Any], json_path: Path) -> str:
         lines += [f"**Skipped:** {report.get('reason')}", ""]
         return "\n".join(lines)
 
-    lines += [
-        "## Metrics",
-        "",
-        "| Metric | Value |",
-        "|--------|-------|",
-    ]
+    lines += ["## Metrics", "", "| Metric | Value |", "|--------|-------|"]
     for key in (
         "Recall@1",
         "Recall@4",

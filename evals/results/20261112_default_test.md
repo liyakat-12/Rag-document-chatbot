@@ -1,10 +1,13 @@
 # Eval report — default
 
-- Generated: `2026-11-12T14:12:33.980115+00:00`
-- Git commit: `a1f86fda9af3c4a48a1c210819df4ce75d19d0ea`
-- Corpus hash: `c6f238d861d10cde7f66eb90b1a5af5c17115063c991b598a0ffd1fd7d68d39c`
+- Generated: `2026-11-12T14:29:07.037309+00:00`
+- Git commit: `17638fa207e5dbb3a6dceaaa8bc29a39d2ece25a`
+- Corpus hash: `610848afabd8afb55d9792b46b3e31bc3d8a19e392f212d87427f182e06f4494`
+- Chunking config hash: `b8896eef7baf7acb`
+- Eval index: `C:\Users\imabb\RAG_Document_Chatbot\evals\.index\610848afabd8afb5_b8896eef7baf7acb`
+- Uses app index: `False`
 - Split: `test`
-- Questions: 49 (human_verified=0, draft=49)
+- Questions: 47 (human_verified=0, draft=47)
 - Verified-only filter: `False`
 - Results JSON: `C:/Users/imabb/RAG_Document_Chatbot/evals/results/20261112_default_test.json`
 
@@ -12,20 +15,20 @@
 
 | Metric | Value |
 |--------|-------|
-| Recall@1 | 0.1111 |
-| Recall@4 | 0.1389 |
-| MRR | 0.1204 |
-| Precision@4 | 0.0347 |
-| hit_rate | 0.1389 |
-| not_found_accuracy | 0.7347 |
+| Recall@1 | 0.9706 |
+| Recall@4 | 1.0000 |
+| MRR | 0.9779 |
+| Precision@4 | 0.2500 |
+| hit_rate | 1.0000 |
+| not_found_accuracy | 0.7234 |
 | refusal_precision | — |
 | refusal_recall | 0.0000 |
 | false_refusal_rate | 0.0000 |
 
-Latency p50: 14.9 ms · p95: 18.87 ms
+Latency p50: 12.51 ms · p95: 21.11 ms
 
 ### Notes
 
-This run scores retrieval against gold spans. Refusal metrics use empty-retrieval as a proxy; answer-path refusal is Phase 2.
+Scores retrieval on the isolated eval index built from evals/corpus/. Does not use the app FAISS/BM25 or SQLite.
 
 Draft labels are unverified. Headline claims require label_source=human_verified and verified_only=true.

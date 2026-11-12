@@ -5,6 +5,13 @@ Format inspired by Keep a Changelog. Newest first.
 
 ## [Unreleased]
 
+### Fixed — Phase 1 follow-ups (pre-Phase 2)
+- Isolated eval index under `evals/.index/` (never uses app FAISS/BM25/SQLite); results
+  record `corpus_hash` + `chunking_config_hash`.
+- Removed personal/unclear-licence corpus PDFs and related questions; public fixtures only.
+- Labeling CLI: `python -m evals.label` (v/e/d/s/q).
+- Span sanity check: `python -m evals.span_check` (0 failures on current drafts).
+
 ### Added — Phase 1 (evaluation foundation)
 - `PROJECT_AUDIT.md` — architecture, feature table, chunk-ID stability, deletion behaviour,
   live refusal examples, risks, later-phase conflicts.

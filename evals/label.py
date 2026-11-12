@@ -1,0 +1,187 @@
+"""Interactive labeling helper: python -m evals.label
+
+Keys: v=verify, e=edit in $EDITOR, d=delete, s=skip, q=quit. Saves after each action.
+"""
+
+from __future__ import annotations
+
+import os
+import re
+import subprocess
+import tempfile
+from collections import Counter
+from pathlib import Path
+
+from evals.corpus_util import CORPUS_DIR, list_corpus_files
+from evals.schema import Question, load_questions, write_questions
+from evals.span_check import normalize_for_match
+from evals.span_map import basename_key, normalize_text
+
+QUESTIONS_PATH = Path(__file__).resolve().parent / "data" / "questions.jsonl"
+
+
+def _load_page(filename: str, page: int) -> str | None:
+    from backend.app.rag.ingest import load_pdf
+
+    key = basename_key(filename)
+    match = next((p for p in CORPUS_DIR.glob("*.pdf") if basename_key(p.name) == key), None)
+    if match is None:
+        return None
+    pages = load_pdf(match)
+    if page < 1 or page > len(pages):
+        return None
+    return pages[page - 1].page_content
+
+
+def _highlight(text: str, span: str) -> str:
+    if not text:
+        return "(no page text)"
+    # Find approximate location with normalisation, then show raw context
+    nt = normalize_for_match(text)
+    ns = normalize_for_match(span)
+    # Fall back: show first 500 chars + span
+    raw = text
+    idx = raw.find(span) if span else -1
+    if idx < 0:
+        # try ignoring extra whitespace in raw by sliding
+        compact = re.sub(r"\s+", " ", raw)
+        cspan = re.sub(r"\s+", " ", span)
+        cidx = compact.find(cspan)
+        if cidx >= 0:
+            start = max(0, cidx - 80)
+            end = min(len(compact), cidx + len(cspan) + 80)
+            snippet = compact[start:end]
+            return (
+                ("…" if start else "")
+                + snippet[: cidx - start]
+                + ">>>"
+                + snippet[cidx - start : cidx - start + len(cspan)]
+                + "<<<"
+                + snippet[cidx - start + len(cspan) :]
+                + ("…" if end < len(compact) else "")
+                + "\n(shown with collapsed whitespace; span normalised match="
+                + str(ns in nt)
+                + ")"
+            )
+        return f"(span not found on page; normalised_match={ns in nt})\n--- page start ---\n{raw[:600]}"
+    start = max(0, idx - 120)
+    end = min(len(raw), idx + len(span) + 120)
+    return (
+        ("…" if start else "")
+        + raw[start:idx]
+        + ">>>"
+        + raw[idx : idx + len(span)]
+        + "<<<"
+        + raw[idx + len(span) : end]
+        + ("…" if end < len(raw) else "")
+    )
+
+
+def _top_corpus_hits(query: str, k: int = 5) -> list[str]:
+    """Simple lexical scan of corpus pages for unanswerable confirmation."""
+    terms = [t.lower() for t in re.findall(r"[A-Za-z0-9][A-Za-z0-9\-_/]{2,}", query)]
+    terms = [t for t in terms if t not in {"the", "and", "for", "what", "how", "who", "does", "according"}]
+    if not terms:
+        return ["(no key terms extracted)"]
+    from backend.app.rag.ingest import load_pdf
+
+    scored: list[tuple[int, str]] = []
+    for pdf in list_corpus_files(CORPUS_DIR):
+        if pdf.suffix.lower() != ".pdf":
+            continue
+        try:
+            pages = load_pdf(pdf)
+        except Exception as exc:
+            scored.append((0, f"{pdf.name}: load error {exc}"))
+            continue
+        for i, page in enumerate(pages, start=1):
+            low = page.page_content.lower()
+            hits = sum(1 for t in terms if t in low)
+            if hits:
+                snippet = re.sub(r"\s+", " ", page.page_content)[:160]
+                scored.append((hits, f"{pdf.name} p{i} (term_hits={hits}): {snippet}"))
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return [s for _, s in scored[:k]] or ["(no lexical hits in corpus)"]
+
+
+def _edit_question(q: Question) -> Question:
+    editor = os.environ.get("EDITOR") or os.environ.get("VISUAL") or "notepad"
+    import json
+
+    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8") as f:
+        f.write(json.dumps(q.to_dict(), indent=2, ensure_ascii=False))
+        path = f.name
+    try:
+        subprocess.call([editor, path])
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+        from evals.schema import _parse_question
+
+        return _parse_question(data, line_no=0)
+    finally:
+        Path(path).unlink(missing_ok=True)
+
+
+def run(path: Path = QUESTIONS_PATH) -> int:
+    qs = load_questions(path)
+    drafts = [i for i, q in enumerate(qs) if q.label_source == "draft"]
+    print(f"Loaded {len(qs)} questions · {len(drafts)} drafts to review")
+    print("Keys: [v]erify  [e]dit  [d]elete  [s]kip  [q]uit\n")
+
+    for pos, idx in enumerate(drafts):
+        q = qs[idx]
+        print("=" * 72)
+        print(f"[{pos + 1}/{len(drafts)}] id={q.id}  split={q.split}  category={q.category}")
+        print(f"query: {q.query}")
+        print(f"answerable: {q.answerable}  label_source: {q.label_source}")
+        if q.notes:
+            print(f"notes: {q.notes}")
+        if q.answerable:
+            for g in q.gold:
+                print(f"\nGOLD {g.filename} p{g.page}")
+                page = _load_page(g.filename, g.page)
+                print(_highlight(page or "", g.span))
+        else:
+            print("\nTop corpus lexical matches (confirm fact is absent):")
+            for line in _top_corpus_hits(q.query, 5):
+                print(" ·", line)
+
+        while True:
+            choice = input("\nAction [v/e/d/s/q]: ").strip().lower()
+            if choice in {"v", "e", "d", "s", "q"}:
+                break
+            print("Enter v, e, d, s, or q")
+
+        if choice == "q":
+            write_questions(path, qs)
+            print("Saved and quit.")
+            return 0
+        if choice == "s":
+            continue
+        if choice == "d":
+            qs.pop(idx)
+            # rebuild draft indices carefully — break and restart simpler approach
+            write_questions(path, qs)
+            print("Deleted and saved. Restarting remaining drafts…")
+            return run(path)
+        if choice == "e":
+            qs[idx] = _edit_question(q)
+            write_questions(path, qs)
+            print("Edited and saved.")
+            continue
+        if choice == "v":
+            qs[idx].label_source = "human_verified"
+            write_questions(path, qs)
+            print("Marked human_verified and saved.")
+
+    write_questions(path, qs)
+    counts = Counter(q.label_source for q in qs)
+    print("Done.", dict(counts))
+    return 0
+
+
+def main() -> int:
+    return run()
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
