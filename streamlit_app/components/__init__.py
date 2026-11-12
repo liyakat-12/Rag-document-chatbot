@@ -35,15 +35,44 @@ def fmt_status(status: str) -> tuple[str, str]:
     return status.title() if status else "Unknown", "status-warn"
 
 
+def confidence_label(confidence: float | None) -> str:
+    """Descriptive evidence band from the retrieval-strength heuristic."""
+    if confidence is None:
+        return "Unknown evidence"
+    c = float(confidence)
+    if c <= 0:
+        return "Insufficient evidence"
+    if c < 0.45:
+        return "Limited evidence"
+    if c < 0.75:
+        return "Moderate evidence"
+    return "Strong evidence"
+
+
 def confidence_bar(confidence: float | None) -> str:
     if confidence is None:
         return ""
-    pct = max(0, min(100, int(round(float(confidence) * 100))))
+    c = float(confidence)
+    if c <= 0:
+        return ""
+    label = confidence_label(confidence)
+    css = (
+        "evidence-strong"
+        if c >= 0.75
+        else "evidence-limited"
+        if c >= 0.45
+        else "evidence-none"
+    )
+    # Show descriptive label by default; numeric only as secondary detail
+    pct = max(0, min(100, int(round(c * 100))))
     return (
         f'<div style="margin:.35rem 0 .55rem;">'
-        f'<span class="meta-chip">Grounding confidence {pct}%</span>'
+        f'<span class="meta-chip {css}">{label}</span>'
         f'<div class="conf-bar"><span style="width:{pct}%;"></span></div>'
-        f'<div style="font-size:.72rem;color:var(--dm-muted);">Heuristic score from retrieval strength</div>'
+        f'<div style="font-size:.72rem;color:var(--dm-muted);">'
+        f'Retrieval strength heuristic ({pct}%) from fused FAISS+BM25 scores — '
+        f'not a calibrated probability of correctness'
+        f"</div>"
         f"</div>"
     )
 

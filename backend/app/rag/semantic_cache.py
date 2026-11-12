@@ -1,13 +1,22 @@
-"""Semantic cache for near-duplicate queries."""
+"""Semantic / exact cache for near-duplicate queries (scoped by document filter).
+
+Speed notes
+-----------
+- Exact-hash hits use an in-process LRU first (no DB round-trip).
+- Embedding for similarity search is OFF by default (`semantic_cache_similarity=false`)
+  so cache store/lookup does not re-embed on every answer.
+"""
 
 from __future__ import annotations
 
 import hashlib
 import json
+import threading
+from collections import OrderedDict
 from typing import Any, Optional
 
 import numpy as np
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.config import get_settings
@@ -17,9 +26,13 @@ from backend.app.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
-# In-memory counters for admin dashboard
 _cache_hits = 0
 _cache_misses = 0
+
+# Process-local exact cache: query_hash -> payload
+_MEM_MAX = 256
+_mem_lock = threading.Lock()
+_mem: OrderedDict[str, dict[str, Any]] = OrderedDict()
 
 
 def get_cache_stats() -> dict[str, int]:
@@ -35,41 +48,104 @@ def _cosine_similarity(a: list[float], b: list[float]) -> float:
     return float(np.dot(va, vb) / denom)
 
 
-def _query_hash(text: str) -> str:
-    return hashlib.sha256(text.strip().lower().encode()).hexdigest()
+def _scope_key(document_ids: Optional[list[str]]) -> str:
+    if not document_ids:
+        return "all"
+    return ",".join(sorted({d for d in document_ids if d}))
+
+
+def _mode_key() -> str:
+    settings = get_settings()
+    return f"{settings.llm_provider}|{settings.embedding_provider}|{settings.openai_chat_model}"
+
+
+def _query_hash(text: str, document_ids: Optional[list[str]] = None) -> str:
+    normalized = " ".join(text.strip().lower().split())
+    payload = f"{_scope_key(document_ids)}||{_mode_key()}||{normalized}"
+    return hashlib.sha256(payload.encode()).hexdigest()
+
+
+def _sources_match_scope(sources: list[dict[str, Any]], document_ids: Optional[list[str]]) -> bool:
+    if not document_ids:
+        return True
+    allowed = set(document_ids)
+    if not sources:
+        return False
+    for src in sources:
+        doc_id = str(src.get("document_id") or "")
+        if doc_id and doc_id not in allowed:
+            return False
+    return True
+
+
+def _mem_get(qh: str) -> Optional[dict[str, Any]]:
+    with _mem_lock:
+        if qh not in _mem:
+            return None
+        _mem.move_to_end(qh)
+        return dict(_mem[qh])
+
+
+def _mem_put(qh: str, payload: dict[str, Any]) -> None:
+    with _mem_lock:
+        _mem[qh] = payload
+        _mem.move_to_end(qh)
+        while len(_mem) > _MEM_MAX:
+            _mem.popitem(last=False)
+
+
+def _mem_clear() -> None:
+    with _mem_lock:
+        _mem.clear()
 
 
 async def lookup_cache(
     session: AsyncSession,
     query: str,
+    document_ids: Optional[list[str]] = None,
 ) -> Optional[dict[str, Any]]:
-    """Return a cached answer if a semantically similar query exists."""
+    """Return a cached answer if an exact (or optional semantic) match exists."""
     global _cache_hits, _cache_misses
     settings = get_settings()
     if not settings.semantic_cache_enabled:
         return None
 
-    # Exact hash hit first
-    qh = _query_hash(query)
+    qh = _query_hash(query, document_ids)
+
+    # 1) In-memory exact hit (fastest)
+    mem = _mem_get(qh)
+    if mem and _sources_match_scope(mem.get("sources") or [], document_ids):
+        _cache_hits += 1
+        logger.info("semantic_cache_memory_hit", scope=_scope_key(document_ids))
+        return {**mem, "cached": True}
+
+    # 2) DB exact hash
     result = await session.execute(
         select(SemanticCacheEntry).where(SemanticCacheEntry.query_hash == qh)
     )
     entry = result.scalar_one_or_none()
     if entry:
-        entry.hit_count += 1
-        _cache_hits += 1
-        logger.info("semantic_cache_exact_hit", query_hash=qh)
-        return {
-            "answer": entry.answer,
-            "sources": json.loads(entry.sources_json),
-            "confidence": entry.confidence,
-            "cached": True,
-        }
+        sources = json.loads(entry.sources_json)
+        if _sources_match_scope(sources, document_ids):
+            entry.hit_count += 1
+            _cache_hits += 1
+            payload = {
+                "answer": entry.answer,
+                "sources": sources,
+                "confidence": entry.confidence,
+                "cached": True,
+            }
+            _mem_put(qh, payload)
+            logger.info("semantic_cache_exact_hit", query_hash=qh, scope=_scope_key(document_ids))
+            return payload
 
-    # Semantic similarity against recent entries
+    # 3) Optional slow semantic scan (embeds query) — disabled by default
+    if not settings.semantic_cache_similarity or document_ids:
+        _cache_misses += 1
+        return None
+
     embeddings = get_shared_embeddings()
     query_vec = await embeddings.aembed_query(query)
-
     result = await session.execute(
         select(SemanticCacheEntry).order_by(SemanticCacheEntry.created_at.desc()).limit(100)
     )
@@ -77,22 +153,29 @@ async def lookup_cache(
     best: SemanticCacheEntry | None = None
     best_sim = 0.0
     for e in entries:
-        stored = json.loads(e.embedding_json)
+        try:
+            stored = json.loads(e.embedding_json)
+        except Exception:
+            continue
+        if not stored:
+            continue
         sim = _cosine_similarity(query_vec, stored)
         if sim > best_sim:
             best_sim = sim
             best = e
 
     if best and best_sim >= settings.semantic_cache_threshold:
+        sources = json.loads(best.sources_json)
         best.hit_count += 1
         _cache_hits += 1
-        logger.info("semantic_cache_hit", similarity=best_sim)
-        return {
+        payload = {
             "answer": best.answer,
-            "sources": json.loads(best.sources_json),
+            "sources": sources,
             "confidence": best.confidence,
             "cached": True,
         }
+        logger.info("semantic_cache_hit", similarity=best_sim)
+        return payload
 
     _cache_misses += 1
     return None
@@ -104,21 +187,47 @@ async def store_cache(
     answer: str,
     sources: list[dict[str, Any]],
     confidence: float,
+    document_ids: Optional[list[str]] = None,
 ) -> None:
-    """Store a query/answer pair in the semantic cache."""
+    """Store a query/answer pair. Skips embedding unless similarity mode is on."""
     settings = get_settings()
     if not settings.semantic_cache_enabled:
         return
 
-    embeddings = get_shared_embeddings()
-    query_vec = await embeddings.aembed_query(query)
+    qh = _query_hash(query, document_ids)
+    payload = {
+        "answer": answer,
+        "sources": sources,
+        "confidence": confidence,
+        "cached": True,
+    }
+    _mem_put(qh, payload)
+
+    embedding_json = "[]"
+    if settings.semantic_cache_similarity and not document_ids:
+        embeddings = get_shared_embeddings()
+        query_vec = await embeddings.aembed_query(query)
+        embedding_json = json.dumps(query_vec)
+
     entry = SemanticCacheEntry(
-        query_hash=_query_hash(query),
+        query_hash=qh,
         query_text=query,
-        embedding_json=json.dumps(query_vec),
+        embedding_json=embedding_json,
         answer=answer,
         sources_json=json.dumps(sources),
         confidence=confidence,
     )
     session.add(entry)
-    logger.info("semantic_cache_stored")
+    logger.info("semantic_cache_stored", scope=_scope_key(document_ids), mem=True)
+
+
+async def clear_semantic_cache(session: AsyncSession) -> int:
+    """Drop all semantic cache rows + memory."""
+    global _cache_hits, _cache_misses
+    result = await session.execute(delete(SemanticCacheEntry))
+    deleted = int(result.rowcount or 0)
+    _cache_hits = 0
+    _cache_misses = 0
+    _mem_clear()
+    logger.info("semantic_cache_cleared", deleted=deleted)
+    return deleted

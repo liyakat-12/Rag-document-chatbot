@@ -30,21 +30,29 @@ def _port_open(host: str, port: int) -> bool:
 
 
 def is_rag_backend(base_url: str) -> bool:
-    """True only if this API is our RAG Document Chatbot (not another app)."""
+    """True only if this API is DocuMind (not another app on the same port)."""
     try:
         with httpx.Client(timeout=2.0) as client:
             health = client.get(f"{base_url.rstrip('/')}/health")
             if health.status_code != 200:
                 return False
-            data = health.json()
+            try:
+                data = health.json()
+            except Exception:
+                return False
             app_name = str(data.get("app") or "")
             if app_name in {"DocuMind AI", "DocuMind RAG", "RAG Document Chatbot"}:
                 return True
             if data.get("retrieval_strategy") == "hybrid_rrf":
                 return True
-            # MediAssist and similar apps also expose /health but not /history
+            # Require DocuMind-shaped endpoints — other apps often have /health only
+            docs = client.get(f"{base_url.rstrip('/')}/documents")
             hist = client.get(f"{base_url.rstrip('/')}/history")
-            return hist.status_code == 200
+            return (
+                docs.status_code == 200
+                and hist.status_code == 200
+                and "embedding_provider" in data
+            )
     except Exception:
         return False
 

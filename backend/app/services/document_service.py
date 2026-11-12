@@ -180,6 +180,10 @@ async def delete_document(session: AsyncSession, document_id: str) -> bool:
 
     await session.delete(document)
     rebuild_bm25_index()
+    # Avoid serving stale answers that cited the deleted document
+    from backend.app.rag.semantic_cache import clear_semantic_cache
+
+    await clear_semantic_cache(session)
     logger.info("document_deleted", document_id=document_id)
     return True
 
@@ -232,6 +236,9 @@ async def reindex_all(session: AsyncSession) -> tuple[int, int]:
 
     total_chunks = rebuild_from_documents(all_lc_docs)
     rebuild_bm25_index()
+    from backend.app.rag.semantic_cache import clear_semantic_cache
+
+    await clear_semantic_cache(session)
     logger.info("reindex_complete", documents=len(documents), chunks=total_chunks)
     return len(documents), total_chunks
 

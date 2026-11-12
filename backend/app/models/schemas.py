@@ -143,6 +143,7 @@ class AdminStats(BaseModel):
     questions_answered: int = 0
     feedback_up: int = 0
     feedback_down: int = 0
+    latency: dict[str, Any] = Field(default_factory=dict)
 
 
 class HealthResponse(BaseModel):
@@ -152,6 +153,7 @@ class HealthResponse(BaseModel):
     llm_provider: str
     embedding_provider: str = ""
     retrieval_strategy: str = "hybrid_rrf"
+    ready: bool = True
 
 
 class SystemInfo(BaseModel):

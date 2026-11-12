@@ -15,6 +15,7 @@ RRF improves recall for both paraphrased questions and exact keyword queries.
 from __future__ import annotations
 
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
@@ -24,6 +25,7 @@ from rank_bm25 import BM25Okapi
 from backend.app.config import get_settings
 from backend.app.rag.vector_store import get_vector_store, similarity_search
 from backend.app.utils.logging import get_logger
+from backend.app.utils.metrics import record_chat_timings
 
 logger = get_logger(__name__)
 
@@ -146,16 +148,68 @@ def hybrid_search_detailed(
     sparse_w = 1.0 - dense_w
 
     t0 = time.perf_counter()
-    t_dense0 = time.perf_counter()
-    dense = similarity_search(query, k=fetch_k, document_ids=document_ids)
-    dense_ms = (time.perf_counter() - t_dense0) * 1000
 
-    t_sparse0 = time.perf_counter()
-    sparse = bm25_search(query, k=fetch_k, document_ids=document_ids)
-    sparse_ms = (time.perf_counter() - t_sparse0) * 1000
+    # Run FAISS + BM25 concurrently — both are CPU-bound sync calls
+    dense_ms = 0.0
+    sparse_ms = 0.0
+
+    def _dense() -> list[tuple[LCDocument, float]]:
+        nonlocal dense_ms
+        t = time.perf_counter()
+        out = similarity_search(query, k=fetch_k, document_ids=document_ids)
+        dense_ms = (time.perf_counter() - t) * 1000
+        return out
+
+    def _sparse() -> list[tuple[LCDocument, float]]:
+        nonlocal sparse_ms
+        t = time.perf_counter()
+        out = bm25_search(query, k=fetch_k, document_ids=document_ids)
+        sparse_ms = (time.perf_counter() - t) * 1000
+        return out
+
+    with ThreadPoolExecutor(max_workers=2, thread_name_prefix="hybrid") as pool:
+        f_dense = pool.submit(_dense)
+        f_sparse = pool.submit(_sparse)
+        dense = f_dense.result()
+        sparse = f_sparse.result()
+
+    # Drop obviously irrelevant hits (no lexical overlap + weak semantic match)
+    dense = [(d, s) for d, s in dense if s >= 0.22]
+    sparse = [(d, s) for d, s in sparse if s > 0.0]
+    if not dense and not sparse:
+        total_ms = (time.perf_counter() - t0) * 1000
+        record_chat_timings(retrieval_ms=total_ms, faiss_ms=dense_ms, bm25_ms=sparse_ms)
+        return HybridSearchResult(
+            results=[],
+            details={
+                "strategy": "hybrid_rrf",
+                "parallel": True,
+                "top_k": top_k,
+                "fetch_k": fetch_k,
+                "rrf_k": RRF_K,
+                "dense_weight": dense_w,
+                "sparse_weight": sparse_w,
+                "latency_ms": round(total_ms, 2),
+                "semantic": {"count": 0, "latency_ms": round(dense_ms, 2), "hits": []},
+                "bm25": {"count": 0, "latency_ms": round(sparse_ms, 2), "hits": []},
+                "fused": {"count": 0, "hits": []},
+                "empty_reason": "no_relevant_hits",
+            },
+        )
 
     fused_raw = reciprocal_rank_fusion([dense, sparse], weights=[dense_w, sparse_w])
-    results = fused_raw[:top_k]
+    # Deduplicate by chunk_id while preserving RRF order
+    seen: set[str] = set()
+    deduped: list[tuple[LCDocument, float]] = []
+    for doc, score in fused_raw:
+        key = _doc_key(doc)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append((doc, score))
+        if len(deduped) >= top_k:
+            break
+    results = deduped
 
     if results:
         max_score = max(s for _, s in results) or 1.0
@@ -164,8 +218,10 @@ def hybrid_search_detailed(
         normalized = []
 
     total_ms = (time.perf_counter() - t0) * 1000
+    record_chat_timings(retrieval_ms=total_ms, faiss_ms=dense_ms, bm25_ms=sparse_ms)
     details: dict[str, Any] = {
         "strategy": "hybrid_rrf",
+        "parallel": True,
         "top_k": top_k,
         "fetch_k": fetch_k,
         "rrf_k": RRF_K,
@@ -194,6 +250,7 @@ def hybrid_search_detailed(
         latency_ms=round(total_ms, 2),
         dense=len(dense),
         sparse=len(sparse),
+        parallel=True,
     )
     return HybridSearchResult(results=normalized, details=details)
 

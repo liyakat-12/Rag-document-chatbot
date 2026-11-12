@@ -1,0 +1,87 @@
+{
+  "generated_at": "2026-11-12T14:13:08.191631+00:00",
+  "corpus_hash": "c6f238d861d10cde7f66eb90b1a5af5c17115063c991b598a0ffd1fd7d68d39c",
+  "file_count": 10,
+  "files": [
+    {
+      "path": "_smoke_perf.pdf",
+      "sha256": "453571d62f18cf51ca146c65f9a5dd8c2398a84e407262b627deaaaff01b30c6",
+      "bytes": 1058,
+      "origin": "local",
+      "license": "unknown \u2014 review before publishing",
+      "notes": ""
+    },
+    {
+      "path": "api_error_codes.pdf",
+      "sha256": "32d8a462cf9d686731085ca5ee05f41be30af71300d48414f903386ad7aa5013",
+      "bytes": 1316,
+      "origin": "local",
+      "license": "unknown \u2014 review before publishing",
+      "notes": ""
+    },
+    {
+      "path": "deepfake_documentation.pdf",
+      "sha256": "4668c5b56635a6b4f978c5f22a044f4b3de2837156d6b2c0c36dbaf09712abd2",
+      "bytes": 299728,
+      "origin": "local",
+      "license": "unknown \u2014 review before publishing",
+      "notes": ""
+    },
+    {
+      "path": "invoice_fixture_q3.pdf",
+      "sha256": "0bffd1ad4c420a492e49e48368a84562d29cf854863c3bc86496b2dadec31a29",
+      "bytes": 1318,
+      "origin": "local",
+      "license": "unknown \u2014 review before publishing",
+      "notes": ""
+    },
+    {
+      "path": "Liyakat_DataScientist_Resume.pdf",
+      "sha256": "a302b78b94c482857b60a471e055f7e2cb42af13d4eceb6da3d36098eb4491ab",
+      "bytes": 137442,
+      "origin": "local",
+      "license": "unknown \u2014 review before publishing",
+      "notes": ""
+    },
+    {
+      "path": "Liyakat_Hussain_DataScientist_Resume.pdf",
+      "sha256": "be13d74bf7f5d099711f7c0e91ae462f3b327ed9cadfc60cf1b9ede1fbfea299",
+      "bytes": 115406,
+      "origin": "local",
+      "license": "unknown \u2014 review before publishing",
+      "notes": ""
+    },
+    {
+      "path": "MediAssist_Project_Report_final-version_2.pdf",
+      "sha256": "eed87647a24b7ef2624138608433ea7be409a08e42120ba482241ad86dda1945",
+      "bytes": 1562352,
+      "origin": "local",
+      "license": "unknown \u2014 review before publishing",
+      "notes": ""
+    },
+    {
+      "path": "policy_leave_entitlement.pdf",
+      "sha256": "e6f3571031868cff0bbcc0b63d0e9108f69a43ebea4a641d55da28fc70e002fb",
+      "bytes": 1364,
+      "origin": "local",
+      "license": "unknown \u2014 review before publishing",
+      "notes": ""
+    },
+    {
+      "path": "qa_design.pdf",
+      "sha256": "d825f9c1935fde035d5db6338da585508bec47beaa512fdeb3354daff71127ea",
+      "bytes": 1067,
+      "origin": "local",
+      "license": "unknown \u2014 review before publishing",
+      "notes": ""
+    },
+    {
+      "path": "smoke_ada2.pdf",
+      "sha256": "256e2b793348e05bfb2fb3334695e17e969740e21455b9297594f559ba239973",
+      "bytes": 1088,
+      "origin": "local",
+      "license": "unknown \u2014 review before publishing",
+      "notes": ""
+    }
+  ]
+}

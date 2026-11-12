@@ -241,6 +241,11 @@ def rebuild_from_documents(all_docs: list[LCDocument]) -> int:
     return len(all_docs)
 
 
+def _l2_to_similarity(distance: float) -> float:
+    """Convert FAISS L2 distance (lower=better) to a [0, 1]-ish similarity."""
+    return 1.0 / (1.0 + max(0.0, float(distance)))
+
+
 def similarity_search(
     query: str,
     k: int = 4,
@@ -248,17 +253,15 @@ def similarity_search(
 ) -> list[tuple[LCDocument, float]]:
     """Vector similarity search with optional metadata filtering."""
     store = get_vector_store()
-    filter_dict = None
     if document_ids:
-        # FAISS langchain filter: custom callable via fetch then filter
-        results = store.similarity_search_with_score(query, k=k * 3)
+        # Fetch extra then filter — FAISS metadata filter is not always available
+        results = store.similarity_search_with_score(query, k=max(k * 5, 20))
         filtered = [
-            (doc, float(score))
+            (doc, _l2_to_similarity(score))
             for doc, score in results
             if doc.metadata.get("document_id") in document_ids
         ]
         return filtered[:k]
 
     results = store.similarity_search_with_score(query, k=k)
-    # FAISS L2 distance: lower is better — convert to similarity-ish score
-    return [(doc, float(score)) for doc, score in results]
+    return [(doc, _l2_to_similarity(score)) for doc, score in results]

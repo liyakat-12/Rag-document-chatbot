@@ -1,0 +1,11 @@
+{
+  "name": "default",
+  "description": "Current production hybrid RRF settings (frozen for Phase 1 tooling).",
+  "retriever_top_k": 4,
+  "span_min_overlap": 0.5,
+  "llm_provider": "extractive",
+  "embedding_provider": "local",
+  "hybrid_search_weight": 0.5,
+  "chunk_size": 1000,
+  "chunk_overlap": 200
+}

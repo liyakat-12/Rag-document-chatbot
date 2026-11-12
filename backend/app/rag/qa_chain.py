@@ -95,10 +95,14 @@ def compute_confidence(
     docs_with_scores: list[tuple[LCDocument, float]],
     answer: str,
 ) -> float:
-    """Heuristic grounding confidence from retrieval scores (not a calibrated probability)."""
+    """
+    Heuristic *retrieval strength* from fused RRF scores (normalized to top=1).
+
+    This is NOT a calibrated probability that the answer is factually correct.
+    UI should label it as retrieval / grounding strength, not accuracy %.
+    """
     if not docs_with_scores or answer.strip() == NOT_FOUND_MESSAGE:
         return 0.0
-    # Treat extractive-fallback answers as grounded when sources exist
     scores = [s for _, s in docs_with_scores]
     avg = sum(scores) / len(scores)
     top = scores[0]
@@ -106,13 +110,38 @@ def compute_confidence(
     return round(confidence, 3)
 
 
+def confidence_label(confidence: float | None) -> str:
+    """Human-readable evidence band for the heuristic retrieval-strength score."""
+    if confidence is None:
+        return "Unknown evidence"
+    if confidence <= 0:
+        return "Insufficient evidence"
+    if confidence < 0.45:
+        return "Limited evidence"
+    if confidence < 0.75:
+        return "Moderate evidence"
+    return "Strong evidence"
+
+
 def expand_followup_query(question: str, recent_user_questions: list[str]) -> str:
     """Light conversational retrieval rewrite without an extra LLM call."""
+    import re
+
     q = (question or "").strip()
+    # Summary prompts are vague — bias retrieval toward overview-style sections
+    if re.search(
+        r"\b(summar(y|ise|ize)|main points?|key points?|overview|what is this document)\b",
+        q.lower(),
+    ):
+        q = (
+            f"{q}\n"
+            "introduction overview abstract methodology conclusion "
+            "importance objectives key findings"
+        )
     if not recent_user_questions:
         return q
     prior = (recent_user_questions[-1] or "").strip()
-    if not prior or prior.lower() == q.lower():
+    if not prior or prior.lower() == q.lower() or prior.lower() in q.lower():
         return q
     if len(q.split()) <= 12:
         return f"{prior}\n{q}"

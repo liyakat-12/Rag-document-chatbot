@@ -21,13 +21,17 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     logger.info("startup", app=settings.app_name, env=settings.app_env)
     await init_db()
-    # Warm vector store + BM25 if index exists
+    # Warm embeddings + vector store so the first user question is not a cold start
     try:
         from backend.app.rag.hybrid_search import rebuild_bm25_index
+        from backend.app.rag.llm_factory import get_shared_embeddings
         from backend.app.rag.vector_store import get_vector_store
 
+        emb = get_shared_embeddings()
+        emb.embed_query("warmup")
         get_vector_store()
         rebuild_bm25_index()
+        logger.info("warmup_complete", embedding_provider=settings.embedding_provider)
     except Exception as exc:
         logger.warning("vector_store_warmup_skipped", error=str(exc))
     yield
@@ -49,6 +53,20 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @app.middleware("http")
+    async def add_request_id(request, call_next):
+        import time
+        import uuid
+
+        request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+        t0 = time.perf_counter()
+        response = await call_next(request)
+        elapsed_ms = (time.perf_counter() - t0) * 1000
+        response.headers["X-Request-ID"] = request_id
+        response.headers["X-Response-Time-Ms"] = f"{elapsed_ms:.2f}"
+        return response
+
     app.include_router(api_router, prefix=settings.api_prefix)
 
     @app.get("/")

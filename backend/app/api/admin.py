@@ -10,7 +10,7 @@ from backend.app.db.session import get_db
 from backend.app.models.schemas import AdminStats, DocumentStats, HealthResponse, SystemInfo
 from backend.app.services import chat_service
 
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.2.0"
 
 router = APIRouter(tags=["admin"])
 
@@ -25,7 +25,33 @@ async def health() -> HealthResponse:
         llm_provider=settings.llm_provider,
         embedding_provider=settings.embedding_provider,
         retrieval_strategy="hybrid_rrf",
+        ready=True,
     )
+
+
+@router.get("/ready")
+async def ready() -> dict:
+    """Readiness: DB + vector store reachable (does not warm embeddings)."""
+    from sqlalchemy import text
+
+    from backend.app.db.session import AsyncSessionLocal
+    from backend.app.rag.vector_store import get_vector_store
+
+    checks: dict[str, str] = {}
+    try:
+        async with AsyncSessionLocal() as db:
+            await db.execute(text("SELECT 1"))
+        checks["database"] = "ok"
+    except Exception as exc:
+        checks["database"] = f"error: {exc}"
+    try:
+        store = get_vector_store()
+        n = len(getattr(store.docstore, "_dict", {}) or {})
+        checks["vector_store"] = f"ok ({n} chunks)"
+    except Exception as exc:
+        checks["vector_store"] = f"error: {exc}"
+    ok = all(v.startswith("ok") for v in checks.values())
+    return {"ready": ok, "checks": checks}
 
 
 @router.get("/admin/stats", response_model=AdminStats)
@@ -41,6 +67,7 @@ async def admin_dashboard(db: AsyncSession = Depends(get_db)) -> AdminStats:
         questions_answered=data.get("questions_answered", 0),
         feedback_up=data.get("feedback_up", 0),
         feedback_down=data.get("feedback_down", 0),
+        latency=data.get("latency") or {},
     )
 
 

@@ -20,8 +20,9 @@ _is_sqlite = settings.database_url.startswith("sqlite")
 
 # NullPool for SQLite: avoids reused aiosqlite connections that raise
 # "no active connection" under concurrent Streamlit/FastAPI traffic.
+# Never echo SQL by default — DEBUG=true was flooding logs and slowing every chat turn
 _engine_kwargs: dict = {
-    "echo": settings.debug,
+    "echo": False,
     "future": True,
 }
 if _is_sqlite:

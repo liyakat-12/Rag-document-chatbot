@@ -13,24 +13,26 @@ from components import confidence_bar
 def render_sources(sources: list[dict[str, Any]] | None) -> None:
     sources = sources or []
     if not sources:
-        st.caption("No sources for this answer.")
         return
-    st.markdown(f"**Sources · {len(sources)}**")
-    for i, s in enumerate(sources):
-        fname = s.get("filename") or "document.pdf"
-        page = s.get("page_number", "?")
-        score = float(s.get("score") or 0) * 100
-        excerpt = (s.get("content") or "")[:420]
-        with st.expander(
-            f"{fname} · p.{page} · {score:.0f}%",
-            expanded=(i == 0 and len(sources) <= 2),
-        ):
-            st.caption(f"Relevance (fused) {score:.0f}%")
+    with st.expander(f"Supporting evidence · {len(sources)} source(s)", expanded=True):
+        for i, s in enumerate(sources):
+            fname = s.get("filename") or "document.pdf"
+            page = s.get("page_number", "?")
+            score = float(s.get("score") or 0) * 100
+            excerpt = (s.get("content") or "")[:420]
+            st.markdown(f"**{fname}** · page {page}")
+            st.caption(
+                f"Fused retrieval rank strength {score:.0f}% "
+                "(ranking signal, not verified accuracy)"
+            )
             st.write(excerpt + ("…" if len(s.get("content") or "") > 420 else ""))
+            if i < len(sources) - 1:
+                st.divider()
 
 
 def render_confidence(confidence: float | None) -> None:
-    if confidence is None:
+    # Hide for greetings / not-found (0.0)
+    if confidence is None or confidence <= 0:
         return
     st.markdown(confidence_bar(confidence), unsafe_allow_html=True)
 
@@ -44,7 +46,9 @@ def render_retrieval_details(
     timings = timings or {}
     if not retrieval and not timings:
         return
-    with st.expander("Advanced Retrieval Details", expanded=False):
+    if retrieval.get("strategy") in {"greeting", "empty_library"}:
+        return
+    with st.expander("Advanced retrieval details", expanded=False):
         st.caption("Hybrid search diagnostics (FAISS + BM25 → RRF).")
         cols = st.columns(3)
         cols[0].metric("Strategy", str(retrieval.get("strategy") or "hybrid_rrf"))

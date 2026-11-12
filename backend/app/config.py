@@ -66,6 +66,8 @@ class Settings(BaseSettings):
     hybrid_search_weight: float = 0.5
     semantic_cache_enabled: bool = True
     semantic_cache_threshold: float = 0.95
+    # Similarity scan embeds every miss — off by default for snappy exact-hash cache
+    semantic_cache_similarity: bool = False
     # 384 for BAAI/bge-small-en-v1.5 (local); 1536 for text-embedding-3-small
     embedding_dimensions: int = 384
     token_budget_per_request: int = 8000

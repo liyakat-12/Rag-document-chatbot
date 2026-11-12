@@ -7,10 +7,10 @@ enableXsrfProtection = true
 [browser]
 gatherUsageStats = false
 
+# Navy + teal light baseline. Dark mode is applied at runtime via styles/theme.py.
 [theme]
-# Aligned with DocuMind AI light theme (custom CSS still applies on top)
-primaryColor = "#1f6b5c"
-backgroundColor = "#f6f7f9"
-secondaryBackgroundColor = "#ffffff"
-textColor = "#1a2332"
+primaryColor = "#0F766E"
+backgroundColor = "#F8FAFC"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#172B4D"
 font = "sans serif"
