@@ -56,7 +56,20 @@ def _scope_key(document_ids: Optional[list[str]]) -> str:
 
 def _mode_key() -> str:
     settings = get_settings()
-    return f"{settings.llm_provider}|{settings.embedding_provider}|{settings.openai_chat_model}"
+    from backend.app.rag.refusal import refusal_config_hash
+    from backend.app.rag.reranker import reranker_state_for_cache
+
+    refusal_h = refusal_config_hash(settings)
+    rerank_s = reranker_state_for_cache()
+    bm25_tok = getattr(settings, "retrieval_bm25_tokenizer", "whitespace")
+    return (
+        f"{settings.llm_provider}|{settings.embedding_provider}|{settings.openai_chat_model}"
+        f"|refusal:{refusal_h}|rerank:{rerank_s}|bm25:{bm25_tok}"
+        f"|exboost:{int(getattr(settings, 'retrieval_exact_match_boost', False))}"
+        f"|dedupe:{int(getattr(settings, 'retrieval_dedupe_near_duplicates', False))}"
+        f"|citeval:{int(getattr(settings, 'citations_validate', False))}"
+        f"|inj:{int(getattr(settings, 'llm_injection_guard', True))}"
+    )
 
 
 def _query_hash(text: str, document_ids: Optional[list[str]] = None) -> str:

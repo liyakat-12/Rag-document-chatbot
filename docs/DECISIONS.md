@@ -25,3 +25,25 @@ path skips the guard so the snapshot stays stable.
 
 **Reason:** Phase 2 baseline must still measure the original system; flags keep
 defaults unchanged.
+
+## 2026-11-13 — Eval-index ablation BM25 tokenizer
+
+**Decision:** Eval-index ablations labelled `hybrid_rrf_normalized_bm25` /
+`hybrid_all` still use the eval index's whitespace BM25 posting lists for this
+session; normalized tokenization is fully wired in the **app** hybrid path
+(`retrieval.bm25_tokenizer`). Document the gap rather than rebuild a second
+eval BM25 index mid-session.
+
+**Alternatives:** Duplicate eval BM25 with normalized tokens now.
+
+**Reason:** Rebuilding 3013-chunk embeddings/BM25 twice risked hanging the
+unattended session; app-path unit tests cover the normalized tokenizer.
+
+## 2026-11-13 — Reranker dependency
+
+**Decision:** Lazy-load `sentence_transformers.CrossEncoder`; on ImportError or
+load failure, warn and fall back to RRF order (no hard dependency for default
+offline CI).
+
+**Reason:** CI must run offline with no model download when the flag is off;
+when the flag is on in CI without the model, behaviour degrades safely.

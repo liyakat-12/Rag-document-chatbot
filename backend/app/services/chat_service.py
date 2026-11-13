@@ -255,9 +255,59 @@ async def chat(
             message, docs, summary=summary, history=history
         )
         generation_ms = (time.perf_counter() - t_gen) * 1000
-        result = build_qa_result(
-            answer, docs, tokens_used=tokens, cached=False, retrieval=retrieval_meta
-        )
+
+        # Refusal engine (OFF by default — UNCALIBRATED thresholds)
+        from backend.app.config import get_settings as _gs
+
+        _settings = _gs()
+        if getattr(_settings, "refusal_enabled", False):
+            from backend.app.rag.refusal import (
+                apply_refusal_to_answer,
+                compute_signals,
+                decide,
+                thresholds_from_settings,
+            )
+
+            thr = thresholds_from_settings(_settings)
+            signals = compute_signals(
+                message,
+                faiss_ranked=detailed.dense_results,
+                bm25_ranked=detailed.sparse_results,
+                fused_ranked=docs,
+                thresholds=thr,
+            )
+            verdict = decide(signals, thr)
+            snippets = [d.page_content for d, _ in docs[:3]]
+            answer = apply_refusal_to_answer(
+                answer, verdict, related_snippets=snippets
+            )
+            retrieval_meta["refusal"] = {
+                "decision": verdict.decision,
+                "reason": verdict.reason,
+                "signals": signals.as_dict(),
+                "thresholds_uncalibrated": True,
+            }
+
+        if getattr(_settings, "citations_validate", False):
+            from backend.app.rag.citations import validate_citations
+
+            # Provisional packaging then filter
+            provisional = build_qa_result(
+                answer, docs, tokens_used=tokens, cached=False, retrieval=retrieval_meta
+            )
+            cleaned, cite_stats = validate_citations(
+                provisional["sources"], docs, request_id=str(uuid4())
+            )
+            retrieval_meta["citation_validation"] = cite_stats
+            result = build_qa_result(
+                answer, docs, tokens_used=tokens, cached=False, retrieval=retrieval_meta
+            )
+            result["sources"] = cleaned
+            result["retrieved_chunks"] = cleaned
+        else:
+            result = build_qa_result(
+                answer, docs, tokens_used=tokens, cached=False, retrieval=retrieval_meta
+            )
         total_ms = (time.perf_counter() - t_total) * 1000
         result["timings"] = {
             "cache_lookup_ms": round(cache_lookup_ms, 2),

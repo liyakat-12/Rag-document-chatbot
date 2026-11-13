@@ -72,6 +72,31 @@ class Settings(BaseSettings):
     embedding_dimensions: int = 384
     token_budget_per_request: int = 8000
 
+    # Refusal engine (Phase 2) — OFF by default; thresholds UNCALIBRATED
+    refusal_enabled: bool = False
+    refusal_min_rank_agreement: float = 0.25  # UNCALIBRATED
+    refusal_min_faiss_similarity: float = 0.35  # UNCALIBRATED
+    refusal_min_bm25_score: float = 1.0  # UNCALIBRATED
+    refusal_min_content_term_coverage: float = 0.30  # UNCALIBRATED
+    refusal_min_critical_term_coverage: float = 0.40  # UNCALIBRATED
+    refusal_coverage_top_n: int = 4  # UNCALIBRATED
+    refusal_not_found_hard_fails: int = 3  # UNCALIBRATED
+    refusal_weak_evidence_soft_fails: int = 2  # UNCALIBRATED
+
+    # Retrieval extras (Phase 3) — OFF / current behaviour by default
+    retrieval_bm25_tokenizer: Literal["whitespace", "normalized"] = "whitespace"
+    retrieval_reranker_enabled: bool = False
+    retrieval_reranker_top_n: int = 16
+    retrieval_reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    retrieval_exact_match_boost: bool = False
+    retrieval_dedupe_near_duplicates: bool = False
+
+    # Citation validation (Phase 4) — OFF by default
+    citations_validate: bool = False
+
+    # Prompt-injection guard — on for LLM providers only; extractive unaffected
+    llm_injection_guard: bool = True
+
     # Database
     database_url: str = "sqlite+aiosqlite:///./data/chatbot.db"
 
