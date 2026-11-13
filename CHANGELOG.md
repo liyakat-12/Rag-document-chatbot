@@ -5,6 +5,21 @@ Format inspired by Keep a Changelog. Newest first.
 
 ## [Unreleased]
 
+### Added — Unattended session 1 (`unattended-1`)
+- Default-behaviour snapshot + regression lock (`evals/results/_default_behaviour_snapshot.json`,
+  `tests/regression/test_default_behaviour.py`).
+- Refusal engine behind `refusal_enabled=false` (UNCALIBRATED thresholds) +
+  `evals/calibrate_refusal.py` (refuses without ≥20 verified tune labels).
+- Retrieval extras (all off): normalized BM25 tokenizer, cross-encoder reranker,
+  exact-match boost, near-dupe dedupe; draft ablation table
+  `evals/results/_draft_ablation.md` (**DRAFT LABELS — NOT FOR REPORTING**).
+- Citation validation flag `citations_validate=false`; citation precision/recall
+  helpers in `evals/metrics.py`.
+- LLM prompt-injection guard (`llm_injection_guard`, extractive unaffected) +
+  `SECURITY.md` + injection fixture PDFs.
+- CI workflow (offline tests + synthetic smoke floors), content-hash upload
+  dedupe, stronger upload path/encrypt checks, delete clears vectors/BM25/cache.
+
 ### Changed — Phase 1 fixes round 3 (real primary / synthetic CI)
 - Split corpus: `evals/corpus/real/` (primary) vs `evals/corpus/synthetic/` (Phase 4 CI).
   Synthetic manifest entries carry a `SYNTHETIC` notice; questions moved to
