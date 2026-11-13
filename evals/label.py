@@ -38,14 +38,11 @@ def _load_page(filename: str, page: int) -> str | None:
 def _highlight(text: str, span: str) -> str:
     if not text:
         return "(no page text)"
-    # Find approximate location with normalisation, then show raw context
     nt = normalize_for_match(text)
     ns = normalize_for_match(span)
-    # Fall back: show first 500 chars + span
     raw = text
     idx = raw.find(span) if span else -1
     if idx < 0:
-        # try ignoring extra whitespace in raw by sliding
         compact = re.sub(r"\s+", " ", raw)
         cspan = re.sub(r"\s+", " ", span)
         cidx = compact.find(cspan)
@@ -79,31 +76,79 @@ def _highlight(text: str, span: str) -> str:
     )
 
 
-def _top_corpus_hits(query: str, k: int = 5) -> list[str]:
-    """Simple lexical scan of corpus pages for unanswerable confirmation."""
-    terms = [t.lower() for t in re.findall(r"[A-Za-z0-9][A-Za-z0-9\-_/]{2,}", query)]
-    terms = [t for t in terms if t not in {"the", "and", "for", "what", "how", "who", "does", "according"}]
-    if not terms:
-        return ["(no key terms extracted)"]
-    from backend.app.rag.ingest import load_pdf
+def _critical_terms_for_label(query: str) -> list[str]:
+    """Critical terms via refusal signal normaliser (names, numbers, codes)."""
+    from backend.app.rag.refusal import extract_critical_terms, normalize_for_coverage
 
-    scored: list[tuple[int, str]] = []
+    crit = extract_critical_terms(query)
+    # Also include longer content tokens that look entity-like
+    for t in normalize_for_coverage(query):
+        if len(t) >= 4 and t not in crit:
+            # keep numbers/codes/% already in crit; add fund-ish tokens
+            if any(ch.isdigit() for ch in t) or "/" in t or t.endswith("%"):
+                crit.add(t)
+    return sorted(crit, key=len, reverse=True)
+
+
+def scan_corpus_for_critical_terms(query: str) -> list[str]:
+    """Search all primary (real) PDFs for critical terms; return every hit with context."""
+    from backend.app.rag.ingest import load_pdf
+    from backend.app.rag.refusal import normalize_for_coverage
+
+    terms = _critical_terms_for_label(query)
+    if not terms:
+        return ["(no critical terms extracted)"]
+
+    lines: list[str] = [f"Critical terms: {', '.join(terms[:24])}"]
+    hits = 0
     for pdf in list_corpus_files(subset="primary"):
         if pdf.suffix.lower() != ".pdf":
             continue
         try:
             pages = load_pdf(pdf)
         except Exception as exc:
-            scored.append((0, f"{pdf.name}: load error {exc}"))
+            lines.append(f"{pdf} · load error: {exc}")
             continue
-        for i, page in enumerate(pages, start=1):
-            low = page.page_content.lower()
-            hits = sum(1 for t in terms if t in low)
-            if hits:
-                snippet = re.sub(r"\s+", " ", page.page_content)[:160]
-                scored.append((hits, f"{pdf.name} p{i} (term_hits={hits}): {snippet}"))
-    scored.sort(key=lambda x: x[0], reverse=True)
-    return [s for _, s in scored[:k]] or ["(no lexical hits in corpus)"]
+        for i, page in enumerate(pages):
+            meta = page.metadata.get("page")
+            page_no = int(meta) + 1 if isinstance(meta, int) else i + 1
+            toks = set(normalize_for_coverage(page.page_content))
+            # also raw lower for multi-token / slash codes
+            raw_low = (page.page_content or "").lower()
+            matched = [t for t in terms if t in toks or t.lower() in raw_low]
+            if not matched:
+                continue
+            hits += 1
+            compact = re.sub(r"\s+", " ", page.page_content or "")
+            # Find first matching term context
+            ctx = compact[:200]
+            for t in matched:
+                pos = compact.lower().find(t.lower())
+                if pos >= 0:
+                    a = max(0, pos - 60)
+                    b = min(len(compact), pos + len(t) + 80)
+                    ctx = compact[a:b]
+                    break
+            lines.append(
+                f"HIT {pdf.name} p{page_no} · path={pdf} · terms={matched[:6]}\n"
+                f"    …{ctx}…"
+            )
+    if hits == 0:
+        lines.append("(no critical-term hits across the 7 real documents — good for unanswerable)")
+    else:
+        lines.append(f"(total pages with ≥1 critical-term hit: {hits})")
+    return lines
+
+
+def _gold_source_lines(q: Question) -> list[str]:
+    out: list[str] = []
+    for g in q.gold:
+        pdf = find_corpus_pdf(g.filename, subset="all")
+        path = str(pdf) if pdf else "(file not found in corpus)"
+        out.append(f"GOLD {g.filename} p{g.page} · source_pdf={path}")
+        page = _load_page(g.filename, g.page)
+        out.append(_highlight(page or "", g.span))
+    return out
 
 
 def _edit_question(q: Question) -> Question:
@@ -138,13 +183,11 @@ def run(path: Path = QUESTIONS_PATH) -> int:
         if q.notes:
             print(f"notes: {q.notes}")
         if q.answerable:
-            for g in q.gold:
-                print(f"\nGOLD {g.filename} p{g.page}")
-                page = _load_page(g.filename, g.page)
-                print(_highlight(page or "", g.span))
+            for line in _gold_source_lines(q):
+                print(line)
         else:
-            print("\nTop corpus lexical matches (confirm fact is absent):")
-            for line in _top_corpus_hits(q.query, 5):
+            print("\nCritical-term scan across all real corpus PDFs (confirm absence):")
+            for line in scan_corpus_for_critical_terms(q.query):
                 print(" ·", line)
 
         while True:
@@ -161,7 +204,6 @@ def run(path: Path = QUESTIONS_PATH) -> int:
             continue
         if choice == "d":
             qs.pop(idx)
-            # rebuild draft indices carefully — break and restart simpler approach
             write_questions(path, qs)
             print("Deleted and saved. Restarting remaining drafts…")
             return run(path)
