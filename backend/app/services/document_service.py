@@ -46,14 +46,35 @@ async def save_and_index_pdf(
     Persist a PDF to disk, parse, chunk, embed, and store in FAISS + BM25.
 
     Returns (document, pipeline_stages) where stages reflect work that actually ran.
+    Identical content (SHA-256) is not indexed twice — returns the existing document.
     """
     stages: list[dict[str, Any]] = []
     t_all = time.perf_counter()
 
+    from backend.app.rag.content_hash import (
+        find_document_by_hash,
+        register_hash,
+        sha256_bytes,
+    )
+
+    digest = sha256_bytes(raw_bytes)
+    existing_id = find_document_by_hash(digest)
+    if existing_id:
+        existing = await get_document(session, existing_id)
+        if existing and existing.status == "indexed":
+            stages.append(
+                _stage("deduplicated", True, 0, f"identical content hash {digest[:12]}")
+            )
+            return existing, stages
+
     safe_name = sanitize_filename(original_filename)
+    # Ensure stored path cannot escape upload_dir
+    upload_dir = upload_dir.resolve()
     doc_id = str(uuid4())
     stored_name = f"{doc_id}_{safe_name}"
-    file_path = upload_dir / stored_name
+    file_path = (upload_dir / stored_name).resolve()
+    if not str(file_path).startswith(str(upload_dir)):
+        raise ValueError("Invalid storage path.")
 
     t0 = time.perf_counter()
     file_path.write_bytes(raw_bytes)
@@ -138,6 +159,7 @@ async def save_and_index_pdf(
 
         document.chunk_count = len(chunks)
         document.status = "indexed"
+        register_hash(digest, doc_id)
         total_ms = (time.perf_counter() - t_all) * 1000
         logger.info(
             "document_indexed",
@@ -148,10 +170,16 @@ async def save_and_index_pdf(
         )
     except Exception as exc:
         document.status = "error"
-        document.error_message = str(exc)
-        stages.append(_stage("failed", False, 0, str(exc)[:200]))
+        # Never leak internals to API clients — store short safe message
+        safe = "Document processing failed."
+        if "encrypt" in str(exc).lower() or "password" in str(exc).lower():
+            safe = "Encrypted or password-protected PDFs are not supported."
+        elif "no extractable" in str(exc).lower() or "no text" in str(exc).lower():
+            safe = "PDF contains no extractable text."
+        document.error_message = safe
+        stages.append(_stage("failed", False, 0, safe))
         logger.error("document_index_failed", document_id=doc_id, error=str(exc))
-        raise
+        raise ValueError(safe) from None
 
     await session.flush()
     await session.refresh(document)
@@ -180,9 +208,11 @@ async def delete_document(session: AsyncSession, document_id: str) -> bool:
 
     await session.delete(document)
     rebuild_bm25_index()
-    # Avoid serving stale answers that cited the deleted document
+    # Drop every cache entry (conservative: any answer may have used this doc)
     from backend.app.rag.semantic_cache import clear_semantic_cache
+    from backend.app.rag.content_hash import unregister_document
 
+    unregister_document(document_id)
     await clear_semantic_cache(session)
     logger.info("document_deleted", document_id=document_id)
     return True

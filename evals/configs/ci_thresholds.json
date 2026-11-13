@@ -1,0 +1,9 @@
+{
+  "description": "CI smoke floors for synthetic corpus — set slightly below observed draft smoke",
+  "corpus_subset": "synthetic",
+  "questions": "evals/data/questions_synthetic.jsonl",
+  "split": "test",
+  "min_recall_at_4": 0.75,
+  "min_not_found_accuracy": 0.60,
+  "notes": "DRAFT LABELS — gates only for CI regression, not portfolio headlines"
+}

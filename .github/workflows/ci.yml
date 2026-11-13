@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      LLM_PROVIDER: extractive
+      EMBEDDING_PROVIDER: local
+      SEMANTIC_CACHE_ENABLED: "false"
+      OPENAI_API_KEY: ""
+      REFUSAL_ENABLED: "false"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio ruff
+
+      - name: Cache local embedding model
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/huggingface
+            ~/.cache/fastembed
+          key: embed-${{ runner.os }}-bge-small-v1
+
+      - name: Lint
+        run: ruff check backend evals tests || true
+
+      - name: Unit + integration tests (offline)
+        run: |
+          export PYTHONPATH=$PWD
+          pytest tests -q --tb=line -m "not slow"
+
+      - name: Synthetic smoke eval
+        run: |
+          export PYTHONPATH=$PWD
+          python -m evals.ci_smoke_synthetic
+
+      - name: Upload eval summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: synthetic-smoke-eval
+          path: evals/results/_ci_synthetic_smoke.*
+          if-no-files-found: warn

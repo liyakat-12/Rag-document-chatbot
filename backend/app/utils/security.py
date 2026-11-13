@@ -81,4 +81,20 @@ async def validate_pdf_upload(file: UploadFile) -> bytes:
             detail="File content is not a valid PDF.",
         )
 
+    # Encrypted / password-protected PDFs (heuristic)
+    if b"/Encrypt" in data[: min(len(data), 200_000)]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Encrypted or password-protected PDFs are not supported.",
+        )
+
     return data
+
+
+def safe_storage_path(upload_dir: Path, stored_name: str) -> Path:
+    """Resolve a path under upload_dir or raise ValueError (no escape)."""
+    root = upload_dir.resolve()
+    candidate = (root / Path(stored_name).name).resolve()
+    if not str(candidate).startswith(str(root)):
+        raise ValueError("Invalid storage path.")
+    return candidate

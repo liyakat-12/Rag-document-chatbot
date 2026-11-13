@@ -1,0 +1,19 @@
+{
+  "generated_at": "2026-11-13T07:16:26.815848+00:00",
+  "label": "DRAFT LABELS \u2014 CI SMOKE ONLY",
+  "corpus_subset": "synthetic",
+  "n_questions": 76,
+  "n_answerable": 56,
+  "Recall@4": 0.8035714285714286,
+  "not_found_accuracy": 0.7368421052631579,
+  "thresholds": {
+    "description": "CI smoke floors for synthetic corpus \u2014 set slightly below observed draft smoke",
+    "corpus_subset": "synthetic",
+    "questions": "evals/data/questions_synthetic.jsonl",
+    "split": "test",
+    "min_recall_at_4": 0.75,
+    "min_not_found_accuracy": 0.6,
+    "notes": "DRAFT LABELS \u2014 gates only for CI regression, not portfolio headlines"
+  },
+  "pass": true
+}
