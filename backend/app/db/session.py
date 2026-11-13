@@ -62,9 +62,18 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def init_db() -> None:
-    """Create all tables."""
+    """Create all tables, then apply lightweight SQLite migrations."""
     # Import models so metadata is populated
     from backend.app.db import models  # noqa: F401
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+    try:
+        from backend.app.db.migrate import migrate_from_settings
+
+        migrate_from_settings()
+    except Exception as exc:  # pragma: no cover — startup must not die on migrate
+        import logging
+
+        logging.getLogger(__name__).warning("db_migrate_skipped: %s", exc)

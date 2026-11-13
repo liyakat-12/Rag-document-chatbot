@@ -163,6 +163,12 @@ def add_documents(documents: list[LCDocument]) -> list[str]:
                 "filename": doc.metadata.get("filename"),
                 "page_number": doc.metadata.get("page_number"),
                 "chunk_index": doc.metadata.get("chunk_index"),
+                "file_type": doc.metadata.get("file_type"),
+                "location_type": doc.metadata.get("location_type"),
+                "location": doc.metadata.get("location"),
+                "parent_chunk_id": doc.metadata.get("parent_chunk_id"),
+                "extraction_method": doc.metadata.get("extraction_method"),
+                "uploaded_at": doc.metadata.get("uploaded_at"),
             }
             meta.setdefault("doc_chunk_ids", {}).setdefault(document_id, []).append(chunk_id)
         _save_metadata(meta)

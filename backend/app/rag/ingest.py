@@ -179,10 +179,15 @@ def split_documents(
     documents: list[LCDocument],
     document_id: str,
     filename: str,
+    *,
+    file_type: str = "pdf",
+    extraction_method: str = "text",
+    uploaded_at: str | None = None,
 ) -> list[LCDocument]:
     """
     Split documents into chunks with rich metadata:
-    filename, page_number, chunk_id, document_id.
+    document_id, filename, file_type, location_type, location, chunk_id,
+    parent_chunk_id, extraction_method, upload timestamp.
     """
     settings = get_settings()
     splitter = RecursiveCharacterTextSplitter(
@@ -194,16 +199,31 @@ def split_documents(
     chunks = splitter.split_documents(documents)
     enriched: list[LCDocument] = []
     for idx, chunk in enumerate(chunks):
+        # Prefer explicit section location (DOCX); else PDF 0-indexed page
+        loc_type = str(chunk.metadata.get("location_type") or "")
+        location = str(chunk.metadata.get("location") or "")
         page = chunk.metadata.get("page", 0)
-        # PyPDFLoader uses 0-indexed pages
-        page_number = int(page) + 1 if isinstance(page, int) else 1
+        page_number = int(page) + 1 if isinstance(page, int) else int(chunk.metadata.get("page_number") or 1)
+        if not loc_type:
+            loc_type = "page"
+        if not location:
+            location = str(page_number)
         chunk_id = f"{document_id}_{idx}"
+        parent = chunk.metadata.get("parent_chunk_id")
         meta: dict[str, Any] = {
             **chunk.metadata,
             "document_id": document_id,
             "filename": filename,
+            "file_type": file_type or chunk.metadata.get("file_type") or "pdf",
+            "location_type": loc_type,
+            "location": location,
             "page_number": page_number,
             "chunk_id": chunk_id,
+            "parent_chunk_id": parent,
+            "extraction_method": extraction_method
+            or chunk.metadata.get("extraction_method")
+            or "text",
+            "uploaded_at": uploaded_at or chunk.metadata.get("uploaded_at"),
             "chunk_index": idx,
             "token_count": count_tokens(chunk.page_content),
         }

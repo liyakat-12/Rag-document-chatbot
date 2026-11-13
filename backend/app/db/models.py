@@ -32,6 +32,8 @@ class Document(Base):
     chunk_count: Mapped[int] = mapped_column(Integer, default=0)
     status: Mapped[str] = mapped_column(String(32), default="pending")  # pending|indexed|error
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    file_type: Mapped[str] = mapped_column(String(32), default="pdf")  # pdf | docx
+    extraction_method: Mapped[str] = mapped_column(String(32), default="text")  # text|ocr|docx
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
@@ -54,6 +56,14 @@ class DocumentChunk(Base):
     content: Mapped[str] = mapped_column(Text, nullable=False)
     token_count: Mapped[int] = mapped_column(Integer, default=0)
     faiss_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    # Rich citation / provenance metadata (backfilled for legacy PDF rows)
+    filename: Mapped[str] = mapped_column(String(512), default="")
+    file_type: Mapped[str] = mapped_column(String(32), default="pdf")
+    location_type: Mapped[str] = mapped_column(String(32), default="page")  # page | section
+    location: Mapped[str] = mapped_column(String(512), default="")  # page num or section label
+    parent_chunk_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    extraction_method: Mapped[str] = mapped_column(String(32), default="text")  # text|ocr|docx
+    uploaded_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
     document: Mapped["Document"] = relationship(back_populates="chunks")

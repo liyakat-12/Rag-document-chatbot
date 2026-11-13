@@ -48,6 +48,19 @@ offline CI).
 **Reason:** CI must run offline with no model download when the flag is off;
 when the flag is on in CI without the model, behaviour degrades safely.
 
+## 2026-11-13 — Chunk metadata migration without Alembic (Unattended-3)
+
+**Decision:** Extend `document_chunks` / `documents` via a lightweight SQLite
+`ALTER TABLE` migrator (`backend/app/db/migrate.py`) run from `init_db`, not Alembic.
+Backfill legacy rows as `file_type=pdf`, `location_type=page`, `extraction_method=text`,
+`location=<page_number>`, `parent_chunk_id=NULL`. FAISS chunk metadata mirrors the same
+fields on new ingest; existing vectors are left as-is (IDs/content unchanged).
+
+**Alternatives:** Alembic; full reindex of every document on upgrade.
+
+**Reason:** Zero new dependency; safe on a copied DB; default retrieval/answers
+unchanged so the behaviour snapshot stays green.
+
 ## 2026-11-13 — Docker offline defaults (Unattended-2)
 
 **Decision:** Single `Dockerfile` for both `api` and `ui` Compose services;

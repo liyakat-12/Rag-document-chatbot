@@ -87,6 +87,8 @@ async def save_and_index_pdf(
         file_path=str(file_path),
         file_size=len(raw_bytes),
         status="pending",
+        file_type="pdf",
+        extraction_method="text",
     )
     session.add(document)
     await session.flush()
@@ -134,7 +136,15 @@ async def save_and_index_pdf(
         )
 
         t0 = time.perf_counter()
-        chunks = split_documents(pages, document_id=doc_id, filename=original_filename)
+        upload_ts = document.created_at.isoformat() if document.created_at else None
+        chunks = split_documents(
+            pages,
+            document_id=doc_id,
+            filename=original_filename,
+            file_type="pdf",
+            extraction_method="text",
+            uploaded_at=upload_ts,
+        )
         if not chunks:
             raise ValueError("No text chunks could be created from this PDF.")
         stages.append(
@@ -151,6 +161,13 @@ async def save_and_index_pdf(
                     page_number=int(chunk.metadata["page_number"]),
                     content=chunk.page_content,
                     token_count=int(chunk.metadata.get("token_count", 0)),
+                    filename=str(chunk.metadata.get("filename") or original_filename),
+                    file_type=str(chunk.metadata.get("file_type") or "pdf"),
+                    location_type=str(chunk.metadata.get("location_type") or "page"),
+                    location=str(chunk.metadata.get("location") or chunk.metadata.get("page_number") or ""),
+                    parent_chunk_id=chunk.metadata.get("parent_chunk_id"),
+                    extraction_method=str(chunk.metadata.get("extraction_method") or "text"),
+                    uploaded_at=document.created_at,
                 )
             )
         session.add_all(chunk_rows)
@@ -254,8 +271,16 @@ async def reindex_all(session: AsyncSession) -> tuple[int, int]:
 
             pages = load_pdf(path)
             document.page_count = len(pages)
+            ft = getattr(document, "file_type", None) or "pdf"
+            em = getattr(document, "extraction_method", None) or "text"
+            upload_ts = document.created_at.isoformat() if document.created_at else None
             chunks = split_documents(
-                pages, document_id=document.id, filename=document.original_filename
+                pages,
+                document_id=document.id,
+                filename=document.original_filename,
+                file_type=ft,
+                extraction_method=em,
+                uploaded_at=upload_ts,
             )
             chunk_rows = []
             for chunk in chunks:
@@ -267,6 +292,17 @@ async def reindex_all(session: AsyncSession) -> tuple[int, int]:
                         page_number=int(chunk.metadata["page_number"]),
                         content=chunk.page_content,
                         token_count=int(chunk.metadata.get("token_count", 0)),
+                        filename=str(chunk.metadata.get("filename") or document.original_filename),
+                        file_type=str(chunk.metadata.get("file_type") or ft),
+                        location_type=str(chunk.metadata.get("location_type") or "page"),
+                        location=str(
+                            chunk.metadata.get("location")
+                            or chunk.metadata.get("page_number")
+                            or ""
+                        ),
+                        parent_chunk_id=chunk.metadata.get("parent_chunk_id"),
+                        extraction_method=str(chunk.metadata.get("extraction_method") or em),
+                        uploaded_at=document.created_at,
                     )
                 )
             session.add_all(chunk_rows)
