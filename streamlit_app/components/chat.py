@@ -21,6 +21,34 @@ SUGGESTIONS = [
 
 NOT_FOUND_SNIPPET = "couldn't find that information"
 
+_STATUS_CSS = {
+    "answered": "status-ok",
+    "weak_evidence": "status-warn",
+    "not_found": "status-err",
+}
+
+
+def _refusal_badge(msg: dict[str, Any]) -> tuple[str, str] | None:
+    """Return (label, css) when refusal meta is present; else None."""
+    retrieval = msg.get("retrieval") or {}
+    refusal = retrieval.get("refusal") or {}
+    decision = refusal.get("decision")
+    if not decision:
+        return None
+    labels = {
+        "answered": "Answered",
+        "weak_evidence": "Weak evidence",
+        "not_found": "Not found",
+    }
+    return labels.get(str(decision), str(decision)), _STATUS_CSS.get(str(decision), "status-warn")
+
+
+def _find_prior_user_prompt(messages: list[dict[str, Any]], assistant_index: int) -> str | None:
+    for j in range(assistant_index - 1, -1, -1):
+        if messages[j].get("role") == "user":
+            return messages[j].get("content") or None
+    return None
+
 
 def _is_greeting_turn(msg: dict[str, Any]) -> bool:
     retrieval = msg.get("retrieval") or {}
@@ -121,6 +149,7 @@ def _doc_label(doc: dict[str, Any], seen: dict[str, int]) -> str:
 
 def _run_chat_turn(client_factory: Callable, prompt: str) -> None:
     st.session_state.messages.append({"role": "user", "content": prompt})
+    st.session_state["chat_loading"] = True
     with st.chat_message("user"):
         st.markdown(prompt)
 
@@ -176,10 +205,31 @@ def _run_chat_turn(client_factory: Callable, prompt: str) -> None:
             st.session_state.pop("last_failed_prompt", None)
         except Exception as exc:
             err = friendly_error(exc)
+            # Never surface stack traces in the chat transcript
+            if "Traceback" in str(exc) or "Traceback" in err:
+                err = "Something went wrong while answering. Please try again."
             placeholder.error(err)
             full = err
             st.session_state["last_failed_prompt"] = prompt
+            st.session_state["chat_loading"] = False
+            assistant_msg = {
+                "id": None,
+                "role": "assistant",
+                "content": full,
+                "confidence": 0.0,
+                "sources": [],
+                "cached": False,
+                "retrieval": {},
+                "timings": {},
+                "rating": "none",
+                "is_error": True,
+            }
+            st.session_state.messages.append(assistant_msg)
+            st.rerun()
+            return
 
+        st.session_state["chat_loading"] = False
+        st.session_state.pop("last_failed_prompt", None)
         assistant_msg = {
             "id": done_event.get("message_id"),
             "role": "assistant",
@@ -190,6 +240,7 @@ def _run_chat_turn(client_factory: Callable, prompt: str) -> None:
             "retrieval": retrieval or done_event.get("retrieval") or {},
             "timings": done_event.get("timings") or {},
             "rating": "none",
+            "is_error": False,
         }
         st.session_state.messages.append(assistant_msg)
         st.rerun()
@@ -326,19 +377,42 @@ def render_chat(client_factory: Callable, *, llm_provider: str = "") -> None:
         if mode_note:
             st.markdown(f'<div class="mode-banner">{mode_note}</div>', unsafe_allow_html=True)
 
+        tool_cols = st.columns([1, 1, 2])
+        with tool_cols[0]:
+            if st.button("Clear conversation", key="clear_conv", use_container_width=True):
+                st.session_state.messages = []
+                st.session_state.session_id = None
+                st.session_state.pending_prompt = None
+                st.session_state.pop("last_failed_prompt", None)
+                st.session_state["chat_loading"] = False
+                st.rerun()
+
+        if st.session_state.get("chat_loading"):
+            st.caption("Working…")
+
         for i, msg in enumerate(st.session_state.messages):
             with st.chat_message(msg["role"]):
                 st.markdown(msg["content"])
                 if msg["role"] == "assistant":
-                    is_error = bool(
+                    is_error = bool(msg.get("is_error")) or bool(
                         st.session_state.get("last_failed_prompt")
                         and i == len(st.session_state.messages) - 1
                         and not msg.get("id")
                     )
                     is_greeting = _is_greeting_turn(msg)
                     is_weak = _is_weak_evidence(msg)
+                    badge = _refusal_badge(msg)
+                    if badge:
+                        label, css = badge
+                        reason = ((msg.get("retrieval") or {}).get("refusal") or {}).get("reason") or ""
+                        st.markdown(
+                            f'<span class="{css}">{label}</span>',
+                            unsafe_allow_html=True,
+                        )
+                        if reason:
+                            st.caption(reason)
 
-                    a1, a2 = st.columns([1, 1])
+                    a1, a2, a3 = st.columns([1, 1, 1])
                     with a1:
                         st.download_button(
                             "Copy answer",
@@ -349,14 +423,26 @@ def render_chat(client_factory: Callable, *, llm_provider: str = "") -> None:
                             use_container_width=True,
                         )
                     with a2:
+                        prior = _find_prior_user_prompt(st.session_state.messages, i)
+                        if prior and st.button(
+                            "Regenerate",
+                            key=f"regen_{i}",
+                            use_container_width=True,
+                        ):
+                            # Drop this assistant (+ its user) and re-ask
+                            st.session_state.messages = st.session_state.messages[: i - 1 if i > 0 else 0]
+                            st.session_state.pending_prompt = prior
+                            st.session_state.pop("last_failed_prompt", None)
+                            st.rerun()
+                    with a3:
                         if is_error:
                             if st.button("Retry", key=f"retry_{i}", use_container_width=True):
-                                st.session_state.pending_prompt = st.session_state.pop(
-                                    "last_failed_prompt"
-                                )
-                                # Drop the failed exchange so retry is clean
+                                failed = st.session_state.pop("last_failed_prompt", None)
+                                prompt_retry = failed or prior
                                 if len(st.session_state.messages) >= 2:
                                     st.session_state.messages = st.session_state.messages[:-2]
+                                if prompt_retry:
+                                    st.session_state.pending_prompt = prompt_retry
                                 st.rerun()
 
                     if msg.get("cached"):
@@ -372,6 +458,9 @@ def render_chat(client_factory: Callable, *, llm_provider: str = "") -> None:
                             "Try rephrasing, selecting a different document scope, or uploading "
                             "a PDF that covers the topic."
                         )
+                        # Still show sources/previews when present
+                        if msg.get("sources"):
+                            render_sources(msg.get("sources"), msg_index=i)
                     else:
                         render_confidence(msg.get("confidence"))
                         render_sources(msg.get("sources"), msg_index=i)
