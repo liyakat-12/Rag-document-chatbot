@@ -5,6 +5,22 @@ Format inspired by Keep a Changelog. Newest first.
 
 ## [Unreleased]
 
+### Added — Unattended session 2 (`unattended-2`)
+- Labeling support: tune unanswerable draft additions
+  (`evals/data/questions_tune_additions.jsonl`); `evals.label` scans all real PDFs
+  for critical terms with page context + gold PDF paths.
+- Citation page viewer (PyMuPDF): click source → highlighted page PNG with exact /
+  normalised / block / chunk fallbacks; page cache under `data/page_cache/`;
+  Documents metadata + page preview.
+- Chat polish: refusal status badges, regenerate, clear conversation, source
+  previews, safer errors; Analytics reads `evals/results/` (latest run, ablation,
+  refusal/citation fields, draft-label warnings, date filter) separate from live usage.
+- Ingest flags (default off): `ingest_strip_repeated_headers_footers`,
+  `ingest_flag_low_text_pages`; enabled flags change `chunking_config_hash` into a
+  separate eval index dir; registered in `INGEST_ABLATIONS` (not auto-run).
+- Docker: `.dockerignore`, Compose `api`+`ui`, model cache volume, optional
+  `PRELOAD_MODELS` build-arg, offline `.env.example` defaults.
+
 ### Added — Unattended session 1 (`unattended-1`)
 - Default-behaviour snapshot + regression lock (`evals/results/_default_behaviour_snapshot.json`,
   `tests/regression/test_default_behaviour.py`).
