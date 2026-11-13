@@ -1,0 +1,38 @@
+{
+  "generated_at": "2026-11-13T07:15:59.042060+00:00",
+  "label": "DRAFT LABELS \u2014 NOT FOR REPORTING",
+  "split": "test",
+  "n_answerable": 51,
+  "ablations": {
+    "faiss_only": {
+      "n": 51,
+      "Recall@4": 0.6862745098039216,
+      "MRR": 0.5098039215686274
+    },
+    "bm25_only": {
+      "n": 51,
+      "Recall@4": 0.5490196078431373,
+      "MRR": 0.4542483660130719
+    },
+    "hybrid_rrf": {
+      "n": 51,
+      "Recall@4": 0.6666666666666666,
+      "MRR": 0.5326797385620915
+    },
+    "hybrid_rrf_normalized_bm25": {
+      "n": 51,
+      "Recall@4": 0.6666666666666666,
+      "MRR": 0.5326797385620915
+    },
+    "hybrid_rrf_reranker": {
+      "n": 51,
+      "Recall@4": 0.7647058823529411,
+      "MRR": 0.6535947712418301
+    },
+    "hybrid_all": {
+      "n": 51,
+      "Recall@4": 0.7647058823529411,
+      "MRR": 0.6535947712418301
+    }
+  }
+}

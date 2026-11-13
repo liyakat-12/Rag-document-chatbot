@@ -43,10 +43,29 @@ class HybridSearchResult:
 
     results: list[tuple[LCDocument, float]]
     details: dict[str, Any] = field(default_factory=dict)
+    # Pre-fusion lists (for refusal / ablations; not serialized to clients by default)
+    dense_results: list[tuple[LCDocument, float]] = field(default_factory=list)
+    sparse_results: list[tuple[LCDocument, float]] = field(default_factory=list)
+
+
+def _tokenize_whitespace(text: str) -> list[str]:
+    """Historical BM25 tokenizer (default). Do not change behaviour lightly."""
+    return [t.lower() for t in text.split() if t.strip()]
+
+
+def _tokenize_normalized(text: str) -> list[str]:
+    """Optional BM25 tokenizer: lowercase, strip punctuation, keep % and codes."""
+    from backend.app.rag.refusal import normalize_for_coverage
+
+    return normalize_for_coverage(text)
 
 
 def _tokenize(text: str) -> list[str]:
-    return [t.lower() for t in text.split() if t.strip()]
+    settings = get_settings()
+    mode = getattr(settings, "retrieval_bm25_tokenizer", "whitespace")
+    if mode == "normalized":
+        return _tokenize_normalized(text)
+    return _tokenize_whitespace(text)
 
 
 def _doc_key(doc: LCDocument) -> str:
@@ -181,6 +200,8 @@ def hybrid_search_detailed(
         record_chat_timings(retrieval_ms=total_ms, faiss_ms=dense_ms, bm25_ms=sparse_ms)
         return HybridSearchResult(
             results=[],
+            dense_results=[],
+            sparse_results=[],
             details={
                 "strategy": "hybrid_rrf",
                 "parallel": True,
@@ -198,7 +219,16 @@ def hybrid_search_detailed(
         )
 
     fused_raw = reciprocal_rank_fusion([dense, sparse], weights=[dense_w, sparse_w])
-    # Deduplicate by chunk_id while preserving RRF order
+    if getattr(settings, "retrieval_exact_match_boost", False):
+        fused_raw = _exact_match_boost(query, fused_raw)
+
+    # Keep a wider candidate pool when optional rerank/dedupe flags are on
+    pool_limit = top_k
+    if getattr(settings, "retrieval_reranker_enabled", False) or getattr(
+        settings, "retrieval_dedupe_near_duplicates", False
+    ):
+        pool_limit = max(top_k * 3, int(getattr(settings, "retrieval_reranker_top_n", 16)))
+
     seen: set[str] = set()
     deduped: list[tuple[LCDocument, float]] = []
     for doc, score in fused_raw:
@@ -207,9 +237,25 @@ def hybrid_search_detailed(
             continue
         seen.add(key)
         deduped.append((doc, score))
-        if len(deduped) >= top_k:
+        if len(deduped) >= pool_limit:
             break
-    results = deduped
+
+    rerank_ms = 0.0
+    rr_info: dict[str, Any] = {"enabled": False}
+    if getattr(settings, "retrieval_reranker_enabled", False) and deduped:
+        from backend.app.rag.reranker import rerank_candidates
+
+        n = int(getattr(settings, "retrieval_reranker_top_n", 16))
+        t_rr = time.perf_counter()
+        deduped, rr_info = rerank_candidates(query, deduped[:n])
+        rerank_ms = (time.perf_counter() - t_rr) * 1000
+
+    if getattr(settings, "retrieval_dedupe_near_duplicates", False):
+        from backend.app.rag.dedupe import dedupe_near_duplicates
+
+        deduped = dedupe_near_duplicates(deduped)
+
+    results = deduped[:top_k]
 
     if results:
         max_score = max(s for _, s in results) or 1.0
@@ -227,7 +273,10 @@ def hybrid_search_detailed(
         "rrf_k": RRF_K,
         "dense_weight": dense_w,
         "sparse_weight": sparse_w,
+        "bm25_tokenizer": getattr(settings, "retrieval_bm25_tokenizer", "whitespace"),
         "latency_ms": round(total_ms, 2),
+        "reranker_ms": round(rerank_ms, 2),
+        "reranker": rr_info,
         "semantic": {
             "count": len(dense),
             "latency_ms": round(dense_ms, 2),
@@ -252,7 +301,35 @@ def hybrid_search_detailed(
         sparse=len(sparse),
         parallel=True,
     )
-    return HybridSearchResult(results=normalized, details=details)
+    return HybridSearchResult(
+        results=normalized,
+        details=details,
+        dense_results=dense,
+        sparse_results=sparse,
+    )
+
+
+def _exact_match_boost(
+    query: str,
+    ranked: list[tuple[LCDocument, float]],
+) -> list[tuple[LCDocument, float]]:
+    """Boost chunks that contain codes, numbers, or quoted phrases from the query."""
+    import re
+
+    quotes = re.findall(r"\"([^\"]+)\"|'([^']+)'", query)
+    phrases = [a or b for a, b in quotes]
+    codes = re.findall(r"\b[A-Z]{2,}(?:/[A-Z0-9.\-]+)+\b", query, flags=re.I)
+    nums = re.findall(r"\b\d+(?:\.\d+)?%?\b", query)
+    needles = [p for p in phrases + codes + nums if p]
+    if not needles:
+        return ranked
+    boosted: list[tuple[LCDocument, float]] = []
+    for doc, score in ranked:
+        text = (doc.page_content or "").lower()
+        hit = sum(1 for n in needles if n.lower() in text)
+        boosted.append((doc, score * (1.0 + 0.15 * hit)))
+    boosted.sort(key=lambda x: x[1], reverse=True)
+    return boosted
 
 
 def hybrid_search(
