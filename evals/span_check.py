@@ -7,10 +7,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
 
+from evals.corpus_util import find_corpus_pdf
 from evals.schema import Question, load_questions
 from evals.span_map import basename_key, normalize_text
 
-CORPUS_DIR = Path(__file__).resolve().parent / "corpus"
 DEFAULT_QUESTIONS = Path(__file__).resolve().parent / "data" / "questions.jsonl"
 
 
@@ -35,20 +35,25 @@ class SpanFailure:
 def _page_text(filename: str, page: int, cache: dict[str, list[str]]) -> Optional[str]:
     key = basename_key(filename)
     if key not in cache:
-        # find matching corpus file
-        match = None
-        for p in CORPUS_DIR.glob("*.pdf"):
-            if basename_key(p.name) == key:
-                match = p
-                break
+        match = find_corpus_pdf(filename, subset="all")
         if match is None:
             cache[key] = []
             return None
         from backend.app.rag.ingest import load_pdf
 
         pages = load_pdf(match)
-        # load_pdf already cleans; page_number in gold is 1-indexed
-        cache[key] = [d.page_content for d in pages]
+        # Prefer PDF metadata page numbers when present (matches question drafts)
+        by_page: dict[int, str] = {}
+        for i, d in enumerate(pages):
+            meta = d.metadata.get("page")
+            page_no = int(meta) + 1 if isinstance(meta, int) else i + 1
+            by_page[page_no] = d.page_content
+        # Store as dense 1..N list using max page key
+        if by_page:
+            max_p = max(by_page)
+            cache[key] = [by_page.get(i, "") for i in range(1, max_p + 1)]
+        else:
+            cache[key] = []
     pages = cache[key]
     if page < 1 or page > len(pages):
         return None

@@ -1,7 +1,8 @@
-"""Fetch optional public corpus files and regenerate synthetic fixtures.
+"""Regenerate synthetic fixtures and refresh the corpus manifest.
 
-Synthetic scheme/circular fixtures are generated locally (no network) via
-`_gen_public_fixtures.py`. Add remote public URLs to DOWNLOADS when available.
+Synthetic scheme/circular fixtures live under evals/corpus/synthetic/ and are
+generated locally (no network). Real public PDFs under evals/corpus/real/ are
+user-supplied; optional DOWNLOADS entries can fetch into real/.
 """
 
 from __future__ import annotations
@@ -13,16 +14,12 @@ import urllib.request
 from pathlib import Path
 
 CORPUS_DIR = Path(__file__).resolve().parent
+SYNTHETIC_DIR = CORPUS_DIR / "synthetic"
+REAL_DIR = CORPUS_DIR / "real"
 
-# (filename, url, expected_sha256 or None)
-# Prefer stable public URLs. Synthetic fixtures are generated, not downloaded.
+# (filename, url, expected_sha256 or None) → written under real/
 DOWNLOADS: list[tuple[str, str, str | None]] = [
-    # Placeholder for user-supplied public documents:
-    # (
-    #   "sebi_sample.pdf",
-    #   "https://example.com/public/sebi_sample.pdf",
-    #   None,
-    # ),
+    # Add stable public URLs here when automating real-corpus fetches.
 ]
 
 
@@ -31,16 +28,18 @@ def sha256_bytes(data: bytes) -> str:
 
 
 def main() -> int:
-    # Always regenerate synthetic public fixtures so hashes stay reproducible in-repo
-    gen = CORPUS_DIR / "_gen_public_fixtures.py"
+    gen = SYNTHETIC_DIR / "_gen_public_fixtures.py"
     if gen.is_file():
-        print("Generating synthetic public fixtures…")
+        print("Generating synthetic public fixtures →", SYNTHETIC_DIR)
         subprocess.check_call([sys.executable, str(gen)], cwd=str(CORPUS_DIR.parent.parent))
+    else:
+        print("WARNING: missing", gen, file=sys.stderr)
 
+    REAL_DIR.mkdir(parents=True, exist_ok=True)
     if DOWNLOADS:
         for name, url, expected in DOWNLOADS:
-            dest = CORPUS_DIR / name
-            print(f"Fetching {url} → {dest.name}")
+            dest = REAL_DIR / name
+            print(f"Fetching {url} → {dest}")
             with urllib.request.urlopen(url, timeout=120) as resp:
                 data = resp.read()
             digest = sha256_bytes(data)
@@ -50,7 +49,7 @@ def main() -> int:
             dest.write_bytes(data)
             print(f"  wrote {len(data)} bytes sha256={digest}")
     else:
-        print("No remote DOWNLOADS configured (synthetic fixtures only).")
+        print("No remote DOWNLOADS configured (real PDFs expected under evals/corpus/real/).")
 
     from evals.corpus_util import write_manifest
 

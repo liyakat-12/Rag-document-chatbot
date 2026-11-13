@@ -1,8 +1,11 @@
-"""Isolated evaluation FAISS + BM25 index built only from evals/corpus/.
+"""Isolated evaluation FAISS + BM25 index built from the primary corpus (real/).
 
 Never reads or writes the app's live vector_store/ or SQLite database.
 Reuses backend ingest/embedding modules; keeps a separate on-disk cache under
 evals/.index/<corpus_hash>_<chunking_config_hash>/.
+
+Default corpus subset is ``primary`` (evals/corpus/real/). Synthetic fixtures
+under evals/corpus/synthetic/ are reserved for the Phase 4 CI fixture.
 """
 
 from __future__ import annotations
@@ -22,7 +25,7 @@ from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document as LCDocument
 from rank_bm25 import BM25Okapi
 
-from evals.corpus_util import CORPUS_DIR, corpus_hash, list_corpus_files
+from evals.corpus_util import CorpusSubset, corpus_hash, list_corpus_files
 from evals.span_map import RetrievedChunk
 
 EVALS_DIR = Path(__file__).resolve().parent
@@ -68,8 +71,12 @@ def _l2_to_similarity(distance: float) -> float:
     return 1.0 / (1.0 + max(0.0, float(distance)))
 
 
-def _build_chunks(config: dict[str, Any]) -> list[LCDocument]:
-    """Extract + chunk every corpus PDF using the app's ingest helpers."""
+def _build_chunks(
+    config: dict[str, Any],
+    *,
+    subset: CorpusSubset = "primary",
+) -> list[LCDocument]:
+    """Extract + chunk every primary (or selected) corpus PDF."""
     from backend.app.config import get_settings
     from backend.app.rag.ingest import load_pdf, split_documents
 
@@ -82,7 +89,7 @@ def _build_chunks(config: dict[str, Any]) -> list[LCDocument]:
         settings.chunk_size = int(config.get("chunk_size", old_size))
         settings.chunk_overlap = int(config.get("chunk_overlap", old_overlap))
         all_chunks: list[LCDocument] = []
-        for pdf in list_corpus_files(CORPUS_DIR):
+        for pdf in list_corpus_files(subset=subset):
             if pdf.suffix.lower() != ".pdf":
                 continue
             pages = load_pdf(pdf)
@@ -131,13 +138,18 @@ def _load_index(path: Path) -> FAISS | None:
     )
 
 
-def build_or_load_eval_index(config: dict[str, Any]) -> EvalIndex:
+def build_or_load_eval_index(
+    config: dict[str, Any],
+    *,
+    subset: CorpusSubset = "primary",
+) -> EvalIndex:
     """
-    Return an EvalIndex for the current corpus + chunking config.
+    Return an EvalIndex for the current primary corpus + chunking config.
 
     Rebuilds when corpus_hash or chunking_config_hash change.
+    Default subset is ``primary`` (real PDFs only).
     """
-    c_hash = corpus_hash()
+    c_hash = corpus_hash(subset=subset)
     ch_hash = chunking_config_hash(config)
     path = index_dir_for(c_hash, ch_hash)
     meta_path = path / "meta.json"
@@ -149,6 +161,7 @@ def build_or_load_eval_index(config: dict[str, Any]) -> EvalIndex:
             if (
                 meta.get("corpus_hash") == c_hash
                 and meta.get("chunking_config_hash") == ch_hash
+                and meta.get("corpus_subset", "primary") == subset
             ):
                 store = _load_index(path)
         except Exception:
@@ -156,15 +169,16 @@ def build_or_load_eval_index(config: dict[str, Any]) -> EvalIndex:
 
     if store is None:
         INDEX_ROOT.mkdir(parents=True, exist_ok=True)
-        chunks = _build_chunks(config)
+        chunks = _build_chunks(config, subset=subset)
         store = _empty_faiss()
         if chunks:
             store.add_documents(chunks)
         meta = {
             "corpus_hash": c_hash,
             "chunking_config_hash": ch_hash,
+            "corpus_subset": subset,
             "n_chunks": len(chunks),
-            "n_files": len(list_corpus_files(CORPUS_DIR)),
+            "n_files": len(list_corpus_files(subset=subset)),
             "config_slice": {
                 "chunk_size": config.get("chunk_size"),
                 "chunk_overlap": config.get("chunk_overlap"),

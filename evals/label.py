@@ -12,7 +12,7 @@ import tempfile
 from collections import Counter
 from pathlib import Path
 
-from evals.corpus_util import CORPUS_DIR, list_corpus_files
+from evals.corpus_util import find_corpus_pdf, list_corpus_files
 from evals.schema import Question, load_questions, write_questions
 from evals.span_check import normalize_for_match
 from evals.span_map import basename_key, normalize_text
@@ -23,14 +23,16 @@ QUESTIONS_PATH = Path(__file__).resolve().parent / "data" / "questions.jsonl"
 def _load_page(filename: str, page: int) -> str | None:
     from backend.app.rag.ingest import load_pdf
 
-    key = basename_key(filename)
-    match = next((p for p in CORPUS_DIR.glob("*.pdf") if basename_key(p.name) == key), None)
+    match = find_corpus_pdf(filename, subset="all")
     if match is None:
         return None
     pages = load_pdf(match)
-    if page < 1 or page > len(pages):
-        return None
-    return pages[page - 1].page_content
+    by_page: dict[int, str] = {}
+    for i, d in enumerate(pages):
+        meta = d.metadata.get("page")
+        page_no = int(meta) + 1 if isinstance(meta, int) else i + 1
+        by_page[page_no] = d.page_content
+    return by_page.get(page)
 
 
 def _highlight(text: str, span: str) -> str:
@@ -86,7 +88,7 @@ def _top_corpus_hits(query: str, k: int = 5) -> list[str]:
     from backend.app.rag.ingest import load_pdf
 
     scored: list[tuple[int, str]] = []
-    for pdf in list_corpus_files(CORPUS_DIR):
+    for pdf in list_corpus_files(subset="primary"):
         if pdf.suffix.lower() != ".pdf":
             continue
         try:

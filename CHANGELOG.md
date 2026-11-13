@@ -5,6 +5,16 @@ Format inspired by Keep a Changelog. Newest first.
 
 ## [Unreleased]
 
+### Changed — Phase 1 fixes round 3 (real primary / synthetic CI)
+- Split corpus: `evals/corpus/real/` (primary) vs `evals/corpus/synthetic/` (Phase 4 CI).
+  Synthetic manifest entries carry a `SYNTHETIC` notice; questions moved to
+  `evals/data/questions_synthetic.jsonl`.
+- Primary drafts: **99** questions in `evals/data/questions.jsonl` against real SIDs +
+  SEBI circulars (disambiguation / near-miss / paraphrase gates retained).
+- `evals.difficulty` now audits real ingestion (Phase 3 backlog), reports hybrid /
+  FAISS / BM25 by category, hybrid−FAISS gap, and BM25 miss token examples.
+- Eval index hashes **primary** corpus only (`real/`).
+
 ### Changed — Phase 1 fixes round 2 (discriminative eval)
 - Expanded public/synthetic corpus: 6 near-identical fund SIDs, AMC circular, long
   comparative note (`evals/corpus/_gen_public_fixtures.py` + `download_corpus.py`).

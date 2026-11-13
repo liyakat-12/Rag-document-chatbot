@@ -1,4 +1,4 @@
-"""Rebuild ~100 draft questions for a discriminative public corpus."""
+"""Rebuild synthetic-corpus draft questions → questions_synthetic.jsonl (Phase 4 CI)."""
 
 from __future__ import annotations
 
@@ -12,8 +12,8 @@ from evals.schema import GoldItem, Question, write_questions
 from evals.span_map import normalize_text
 
 ROOT = Path(__file__).resolve().parents[1]
-CORPUS = ROOT / "corpus"
-OUT = Path(__file__).resolve().parent / "questions.jsonl"
+CORPUS = ROOT / "corpus" / "synthetic"
+OUT = Path(__file__).resolve().parent / "questions_synthetic.jsonl"
 
 
 def extract_all() -> dict[str, list[str]]:

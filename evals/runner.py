@@ -81,7 +81,7 @@ def evaluate(
     )
     n_verified = sum(1 for q in questions if q.label_source == "human_verified")
     n_draft = sum(1 for q in questions if q.label_source == "draft")
-    c_hash = corpus_hash()
+    c_hash = corpus_hash(subset="primary")
 
     # Build/load isolated index BEFORE any retrieval (never touches app FAISS)
     eval_index = build_or_load_eval_index(config)
