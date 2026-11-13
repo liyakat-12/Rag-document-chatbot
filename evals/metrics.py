@@ -92,6 +92,25 @@ def key_fact_coverage(answer: str, key_facts: Sequence[str]) -> Optional[float]:
     return hits / len(key_facts)
 
 
+def citation_precision(pred_citations: Sequence[dict], gold_filename_pages: set[tuple[str, int]]) -> Optional[float]:
+    """Of predicted citations, share matching gold (filename, page)."""
+    from backend.app.rag.citations import citation_precision as _cp
+
+    return _cp(list(pred_citations), gold_filename_pages)
+
+
+def citation_recall(pred_citations: Sequence[dict], gold_filename_pages: set[tuple[str, int]]) -> Optional[float]:
+    from backend.app.rag.citations import citation_recall as _cr
+
+    return _cr(list(pred_citations), gold_filename_pages)
+
+
+def valid_citation_share(valid: int, total: int) -> Optional[float]:
+    from backend.app.rag.citations import valid_citation_share as _vcs
+
+    return _vcs(valid, total)
+
+
 def latency_summary(samples_ms: Sequence[float]) -> dict[str, Optional[float]]:
     xs = sorted(float(x) for x in samples_ms)
     if not xs:
