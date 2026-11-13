@@ -178,6 +178,38 @@ class RagClient:
         r.raise_for_status()
         return r.json()
 
+    def document_meta(self, document_id: str) -> dict[str, Any]:
+        r = self._client.get(self._url(f"/documents/{document_id}/meta"))
+        if r.status_code >= 400:
+            raise RuntimeError(_error_detail(r))
+        return r.json()
+
+    def document_page_image(
+        self,
+        document_id: str,
+        page_number: int,
+        span: str = "",
+    ) -> tuple[bytes, dict[str, str]]:
+        """Return (png_bytes, response_headers)."""
+        params: dict[str, Any] = {}
+        if span:
+            params["span"] = span
+        r = self._client.get(
+            self._url(f"/documents/{document_id}/pages/{page_number}"),
+            params=params,
+        )
+        if r.status_code >= 400:
+            raise RuntimeError(_error_detail(r))
+        headers = {
+            "match_mode": r.headers.get("X-Match-Mode", ""),
+            "page_count": r.headers.get("X-Page-Count", ""),
+            "page_number": r.headers.get("X-Page-Number", ""),
+            "cache_hit": r.headers.get("X-Cache-Hit", "0"),
+            "filename": r.headers.get("X-Filename", ""),
+            "chunk_fallback": r.headers.get("X-Chunk-Fallback", "0"),
+        }
+        return r.content, headers
+
 
 def _error_detail(response: httpx.Response) -> str:
     try:

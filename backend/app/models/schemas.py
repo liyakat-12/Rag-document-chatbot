@@ -44,6 +44,21 @@ class DocumentStats(BaseModel):
     indexed_documents: int
 
 
+class DocumentPageMeta(BaseModel):
+    """Metadata + optional ingest quality flags for the Documents viewer."""
+
+    id: str
+    original_filename: str
+    page_count: int
+    chunk_count: int
+    file_size: int
+    status: str
+    error_message: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+    low_text_pages: list[dict[str, Any]] = Field(default_factory=list)
+
+
 class IngestStage(BaseModel):
     name: str
     ok: bool

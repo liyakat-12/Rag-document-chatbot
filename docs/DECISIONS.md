@@ -47,3 +47,15 @@ offline CI).
 
 **Reason:** CI must run offline with no model download when the flag is off;
 when the flag is on in CI without the model, behaviour degrades safely.
+
+## 2026-11-13 — Citation viewer match order (Unattended-2)
+
+**Decision:** Highlight path is exact `page.search_for` → whitespace/hyphen
+normalised word-box map → best text-block by token Jaccard (≥0.15) → chunk-text
+fallback with `>>>span<<<` markers. Page PNGs cached under `data/page_cache/`
+keyed by path+mtime+page+span+dpi. Dependency: `pymupdf>=1.24,<2.2`.
+
+**Alternatives:** Always re-render; PDF.js in browser; store highlight quads at ingest.
+
+**Reason:** Works offline in Streamlit without a JS PDF stack; cache keeps
+rerenders cheap; fallbacks cover noisy PDF text extraction.

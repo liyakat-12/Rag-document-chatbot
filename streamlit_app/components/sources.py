@@ -8,9 +8,10 @@ import streamlit as st
 
 import components._pathfix  # noqa: F401
 from components import confidence_bar
+from components.citation_viewer import open_citation_viewer
 
 
-def render_sources(sources: list[dict[str, Any]] | None) -> None:
+def render_sources(sources: list[dict[str, Any]] | None, *, msg_index: int = 0) -> None:
     sources = sources or []
     if not sources:
         return
@@ -19,13 +20,30 @@ def render_sources(sources: list[dict[str, Any]] | None) -> None:
             fname = s.get("filename") or "document.pdf"
             page = s.get("page_number", "?")
             score = float(s.get("score") or 0) * 100
-            excerpt = (s.get("content") or "")[:420]
+            content = s.get("content") or ""
+            excerpt = content[:420]
             st.markdown(f"**{fname}** · page {page}")
             st.caption(
                 f"Fused retrieval rank strength {score:.0f}% "
                 "(ranking signal, not verified accuracy)"
             )
-            st.write(excerpt + ("…" if len(s.get("content") or "") > 420 else ""))
+            # Source preview
+            preview = excerpt + ("…" if len(content) > 420 else "")
+            st.write(preview)
+            doc_id = s.get("document_id") or ""
+            if doc_id and st.button(
+                "Open in viewer",
+                key=f"view_cite_{msg_index}_{i}",
+                use_container_width=True,
+            ):
+                open_citation_viewer(
+                    document_id=doc_id,
+                    filename=fname,
+                    page_number=int(page) if str(page).isdigit() else 1,
+                    span=content[:800],
+                    chunk_text=content,
+                )
+                st.rerun()
             if i < len(sources) - 1:
                 st.divider()
 

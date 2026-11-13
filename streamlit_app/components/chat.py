@@ -9,6 +9,7 @@ import streamlit as st
 
 import components._pathfix  # noqa: F401
 from components import friendly_error
+from components.citation_viewer import render_citation_viewer_panel
 from components.sources import render_confidence, render_retrieval_details, render_sources
 
 SUGGESTIONS = [
@@ -373,7 +374,7 @@ def render_chat(client_factory: Callable, *, llm_provider: str = "") -> None:
                         )
                     else:
                         render_confidence(msg.get("confidence"))
-                        render_sources(msg.get("sources"))
+                        render_sources(msg.get("sources"), msg_index=i)
                         render_retrieval_details(msg.get("retrieval"), msg.get("timings"))
 
                         if msg.get("id"):
@@ -410,6 +411,8 @@ def render_chat(client_factory: Callable, *, llm_provider: str = "") -> None:
                 )
             except Exception as exc:
                 st.caption(f"Export unavailable: {friendly_error(exc)}")
+
+    render_citation_viewer_panel(client_factory)
 
     if pending:
         _run_chat_turn(client_factory, pending)

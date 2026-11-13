@@ -9,6 +9,7 @@ import streamlit as st
 
 import components._pathfix  # noqa: F401
 from components import STAGE_LABELS, fmt_bytes, fmt_status, friendly_error
+from components.citation_viewer import render_doc_browser
 
 
 def _show_stages(stages: list[dict[str, Any]]) -> None:
@@ -137,6 +138,8 @@ def render_documents(client_factory: Callable, max_mb: int = 40) -> None:
         )
         if err and (d.get("status") or "").lower() == "error":
             st.caption(f"Error: {err[:200]}")
+        with st.expander("Metadata & page preview", expanded=False):
+            render_doc_browser(client_factory, d)
         if st.session_state.get(confirm_key):
             st.warning(f"Delete **{d.get('original_filename')}** permanently?")
             c_yes, c_no = st.columns([1, 1])
