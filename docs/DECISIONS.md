@@ -48,6 +48,17 @@ offline CI).
 **Reason:** CI must run offline with no model download when the flag is off;
 when the flag is on in CI without the model, behaviour degrades safely.
 
+## 2026-11-13 — Docker offline defaults (Unattended-2)
+
+**Decision:** Single `Dockerfile` for both `api` and `ui` Compose services;
+offline defaults (`LLM_PROVIDER=extractive`, `EMBEDDING_PROVIDER=local`); named
+volumes for uploads, vectors, data, and model cache; optional
+`PRELOAD_MODELS=1` build-arg. `.env` is optional (`required: false`).
+
+**Reason:** One image keeps the HF Spaces path working; Compose overrides
+commands/ports. Docker CLI was **not** available on this machine — compose was
+not executed here.
+
 ## 2026-11-13 — Ingest quality flags and eval index hash (Unattended-2)
 
 **Decision:** `ingest_strip_repeated_headers_footers` and `ingest_flag_low_text_pages`
