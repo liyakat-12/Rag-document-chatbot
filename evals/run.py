@@ -33,7 +33,19 @@ def main(argv: list[str] | None = None) -> int:
         "--out-dir",
         default=str(Path(__file__).resolve().parent / "results"),
     )
+    parser.add_argument(
+        "--followups",
+        action="store_true",
+        help="Evaluate draft two-turn follow-ups (evals/data/questions_followups.jsonl)",
+    )
     args = parser.parse_args(argv)
+
+    if args.followups:
+        from evals.followups import evaluate_followups
+
+        report = evaluate_followups(split=None if args.split == "all" else args.split)
+        print(json.dumps({k: report.get(k) for k in report if k != "cases"}, indent=2))
+        return 0
 
     from evals.runner import evaluate
 

@@ -48,6 +48,19 @@ offline CI).
 **Reason:** CI must run offline with no model download when the flag is off;
 when the flag is on in CI without the model, behaviour degrades safely.
 
+## 2026-11-13 — Follow-up rewrite behind chat.rewrite_followups (Unattended-3)
+
+**Decision:** New rewrite lives in `backend/app/rag/followups.py` and runs only when
+`chat_rewrite_followups=true`. Default **off** keeps the existing
+`expand_followup_query` path so the behaviour snapshot is unchanged. Offline mode
+carries prior-turn fund/code/doc entities into pronoun/short queries; topic changes
+(new fund/doc entities) skip carry-over. Non-extractive LLM providers may rewrite via
+the configured chat model when the flag is on.
+
+**Alternatives:** Always-on rewrite; replace `expand_followup_query` entirely.
+
+**Reason:** Snapshot / default behaviour must not change; flag gates the new path.
+
 ## 2026-11-13 — Chunk metadata migration without Alembic (Unattended-3)
 
 **Decision:** Extend `document_chunks` / `documents` via a lightweight SQLite

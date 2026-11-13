@@ -237,7 +237,25 @@ async def chat(
         messages = await _load_messages(session, chat_session.id)
         summary = await summarize_if_needed(session, chat_session)
         history = _format_recent_history(messages, exclude_last=True)
-        retrieval_query = expand_followup_query(message, _prior_user_questions(messages))
+        from backend.app.config import get_settings as _gs
+
+        _settings = _gs()
+        prior_qs = _prior_user_questions(messages)
+        followup_meta: dict[str, Any] = {}
+        if getattr(_settings, "chat_rewrite_followups", False):
+            from backend.app.rag.followups import rewrite_followup
+
+            asst = [m.content for m in messages if m.role == "assistant"]
+            rewrite = await rewrite_followup(
+                message,
+                prior_qs,
+                use_llm=True,
+                recent_assistant=asst[-3:],
+            )
+            retrieval_query = rewrite.rewritten
+            followup_meta = rewrite.as_dict()
+        else:
+            retrieval_query = expand_followup_query(message, prior_qs)
 
         t_ret = time.perf_counter()
         detailed = await retrieve_detailed(retrieval_query, document_ids=document_ids)
@@ -246,9 +264,13 @@ async def chat(
         retrieval_meta = {
             **detailed.details,
             "retrieval_query": retrieval_query if retrieval_query != message else None,
+            "original_query": message,
+            "rewritten_query": retrieval_query if retrieval_query != message else None,
             "document_ids": document_ids or [],
             "latency_ms": round(retrieval_ms, 2),
         }
+        if followup_meta:
+            retrieval_meta["followup"] = followup_meta
 
         t_gen = time.perf_counter()
         answer, tokens = await generate_answer(
@@ -257,9 +279,6 @@ async def chat(
         generation_ms = (time.perf_counter() - t_gen) * 1000
 
         # Refusal engine (OFF by default — UNCALIBRATED thresholds)
-        from backend.app.config import get_settings as _gs
-
-        _settings = _gs()
         if getattr(_settings, "refusal_enabled", False):
             from backend.app.rag.refusal import (
                 apply_refusal_to_answer,
@@ -456,7 +475,22 @@ async def chat_stream(
     messages = await _load_messages(session, chat_session.id)
     summary = await summarize_if_needed(session, chat_session)
     history = _format_recent_history(messages, exclude_last=True)
-    retrieval_query = expand_followup_query(message, _prior_user_questions(messages))
+    from backend.app.config import get_settings as _gs_stream
+
+    _settings_s = _gs_stream()
+    prior_qs = _prior_user_questions(messages)
+    followup_meta: dict[str, Any] = {}
+    if getattr(_settings_s, "chat_rewrite_followups", False):
+        from backend.app.rag.followups import rewrite_followup
+
+        asst = [m.content for m in messages if m.role == "assistant"]
+        rewrite = await rewrite_followup(
+            message, prior_qs, use_llm=True, recent_assistant=asst[-3:]
+        )
+        retrieval_query = rewrite.rewritten
+        followup_meta = rewrite.as_dict()
+    else:
+        retrieval_query = expand_followup_query(message, prior_qs)
 
     t_ret = time.perf_counter()
     detailed = await retrieve_detailed(retrieval_query, document_ids=document_ids)
@@ -465,9 +499,13 @@ async def chat_stream(
     retrieval_meta = {
         **detailed.details,
         "retrieval_query": retrieval_query if retrieval_query != message else None,
+        "original_query": message,
+        "rewritten_query": retrieval_query if retrieval_query != message else None,
         "document_ids": document_ids or [],
         "latency_ms": round(retrieval_ms, 2),
     }
+    if followup_meta:
+        retrieval_meta["followup"] = followup_meta
     result_shell = build_qa_result("", docs, tokens_used=0, retrieval=retrieval_meta)
 
     yield {

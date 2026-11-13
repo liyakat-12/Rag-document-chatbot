@@ -99,6 +99,9 @@ class Settings(BaseSettings):
     ingest_flag_low_text_pages: bool = False
     ingest_low_text_char_threshold: int = 100
 
+    # Conversational follow-ups — OFF by default (keeps snapshot / expand_followup_query path)
+    chat_rewrite_followups: bool = False
+
     # Prompt-injection guard — on for LLM providers only; extractive unaffected
     llm_injection_guard: bool = True
 

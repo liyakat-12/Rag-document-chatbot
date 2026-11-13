@@ -68,6 +68,24 @@ def render_retrieval_details(
         return
     with st.expander("Advanced retrieval details", expanded=False):
         st.caption("Hybrid search diagnostics (FAISS + BM25 → RRF).")
+        orig_q = retrieval.get("original_query")
+        rewr_q = retrieval.get("rewritten_query") or retrieval.get("retrieval_query")
+        follow = retrieval.get("followup") or {}
+        if orig_q or rewr_q or follow:
+            st.markdown("**Query rewrite**")
+            if orig_q:
+                st.caption(f"Original: {orig_q}")
+            if rewr_q and rewr_q != orig_q:
+                st.caption(f"Rewritten: {rewr_q}")
+            if follow.get("rewrite_method"):
+                st.caption(
+                    f"Method: {follow.get('rewrite_method')}"
+                    + (
+                        f" · carried: {', '.join(follow.get('entities_carried') or [])}"
+                        if follow.get("entities_carried")
+                        else ""
+                    )
+                )
         cols = st.columns(3)
         cols[0].metric("Strategy", str(retrieval.get("strategy") or "hybrid_rrf"))
         cols[1].metric("Top-K", retrieval.get("top_k", "—"))
