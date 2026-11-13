@@ -50,6 +50,28 @@ ABLATIONS = {
     },
 }
 
+# Ingest-quality ablations (Phase 3). Registered here but NOT run by default —
+# they rebuild a separate eval index via chunking_config_hash. Do not run against
+# real/draft labels until a verified baseline exists.
+INGEST_ABLATIONS = {
+    "hybrid_rrf_strip_headers": {
+        "mode": "hybrid",
+        "bm25_tokenizer": "whitespace",
+        "rerank": False,
+        "ingest_strip_repeated_headers_footers": True,
+        "ingest_flag_low_text_pages": False,
+        "requires_index_rebuild": True,
+    },
+    "hybrid_rrf_flag_low_text": {
+        "mode": "hybrid",
+        "bm25_tokenizer": "whitespace",
+        "rerank": False,
+        "ingest_strip_repeated_headers_footers": False,
+        "ingest_flag_low_text_pages": True,
+        "requires_index_rebuild": True,
+    },
+}
+
 
 def _run_one(index, query: str, spec: dict[str, Any], top_k: int = 4):
     fetch = max(top_k * 2, 8)
@@ -114,6 +136,12 @@ def run_ablations(
         "split": split,
         "n_answerable": len(questions),
         "ablations": table,
+        "ingest_ablations_registered": list(INGEST_ABLATIONS.keys()),
+        "ingest_ablations_note": (
+            "Registered but not executed. Enabling either ingest flag changes "
+            "chunking_config_hash and uses a separate evals/.index/ directory. "
+            "Do not run against labels until a verified baseline exists."
+        ),
     }
     out_dir = out_dir or (ROOT / "evals" / "results")
     out_dir.mkdir(parents=True, exist_ok=True)

@@ -33,7 +33,11 @@ INDEX_ROOT = EVALS_DIR / ".index"
 
 
 def chunking_config_hash(config: dict[str, Any]) -> str:
-    """Stable hash of chunking + embedding settings that affect the index."""
+    """Stable hash of chunking + embedding + ingest-quality settings that affect the index.
+
+    Enabling ``ingest_strip_repeated_headers_footers`` or ``ingest_flag_low_text_pages``
+    changes this hash so eval indexes land in a separate directory under evals/.index/.
+    """
     payload = {
         "chunk_size": int(config.get("chunk_size", 1000)),
         "chunk_overlap": int(config.get("chunk_overlap", 200)),
@@ -44,6 +48,16 @@ def chunking_config_hash(config: dict[str, Any]) -> str:
             or "BAAI/bge-small-en-v1.5"
         ),
     }
+    # Only fold ingest-quality flags into the hash when enabled so the default
+    # index directory (flags off) stays stable; enabled flags get a new dir.
+    strip_h = bool(config.get("ingest_strip_repeated_headers_footers", False))
+    flag_lt = bool(config.get("ingest_flag_low_text_pages", False))
+    if strip_h or flag_lt:
+        payload["ingest_strip_repeated_headers_footers"] = strip_h
+        payload["ingest_flag_low_text_pages"] = flag_lt
+        payload["ingest_low_text_char_threshold"] = int(
+            config.get("ingest_low_text_char_threshold", 100)
+        )
     raw = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
 
@@ -89,10 +103,18 @@ def _build_chunks(
         settings.chunk_size = int(config.get("chunk_size", old_size))
         settings.chunk_overlap = int(config.get("chunk_overlap", old_overlap))
         all_chunks: list[LCDocument] = []
+        strip_h = bool(config.get("ingest_strip_repeated_headers_footers", False))
+        flag_lt = bool(config.get("ingest_flag_low_text_pages", False))
+        lt_thr = int(config.get("ingest_low_text_char_threshold", 100))
         for pdf in list_corpus_files(subset=subset):
             if pdf.suffix.lower() != ".pdf":
                 continue
-            pages = load_pdf(pdf)
+            pages = load_pdf(
+                pdf,
+                strip_headers=strip_h,
+                flag_low_text=flag_lt,
+                low_text_threshold=lt_thr,
+            )
             if not pages:
                 continue
             doc_id = str(uuid4())

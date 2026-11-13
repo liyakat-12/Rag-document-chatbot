@@ -48,6 +48,20 @@ offline CI).
 **Reason:** CI must run offline with no model download when the flag is off;
 when the flag is on in CI without the model, behaviour degrades safely.
 
+## 2026-11-13 — Ingest quality flags and eval index hash (Unattended-2)
+
+**Decision:** `ingest_strip_repeated_headers_footers` and `ingest_flag_low_text_pages`
+default **off**. They are included in `chunking_config_hash` **only when enabled**,
+so the default eval index path is unchanged; turning a flag on creates a separate
+`evals/.index/<corpus>_<chunkhash>/` directory. Ingest ablations are registered in
+`evals.ablation_runner.INGEST_ABLATIONS` but are not executed in the default run.
+
+**Alternatives:** Always include false flags in the hash (would rebuild the 3013-chunk
+default index); run ingest ablations immediately on draft labels.
+
+**Reason:** Preserve the existing default index and avoid draft-label ingest ablations
+before a verified baseline.
+
 ## 2026-11-13 — Citation viewer match order (Unattended-2)
 
 **Decision:** Highlight path is exact `page.search_for` → whitespace/hyphen

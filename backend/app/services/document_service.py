@@ -97,6 +97,21 @@ async def save_and_index_pdf(
         if not pages:
             raise ValueError("PDF contains no extractable text pages.")
         document.page_count = len(pages)
+        # Persist low-text flags for Documents UI when ingest.flag_low_text_pages is on
+        low_text = []
+        for p in pages:
+            doc_flags = p.metadata.get("low_text_pages_doc")
+            if isinstance(doc_flags, list) and doc_flags:
+                low_text = doc_flags
+                break
+        if low_text:
+            import json
+
+            meta_path = Path(str(file_path) + ".meta.json")
+            meta_path.write_text(
+                json.dumps({"low_text_pages": low_text}, indent=2),
+                encoding="utf-8",
+            )
         stages.append(
             _stage(
                 "extracted",

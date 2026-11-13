@@ -94,6 +94,11 @@ class Settings(BaseSettings):
     # Citation validation (Phase 4) — OFF by default
     citations_validate: bool = False
 
+    # Ingestion quality (Phase 3 candidates) — OFF by default; change index hash when on
+    ingest_strip_repeated_headers_footers: bool = False
+    ingest_flag_low_text_pages: bool = False
+    ingest_low_text_char_threshold: int = 100
+
     # Prompt-injection guard — on for LLM providers only; extractive unaffected
     llm_injection_guard: bool = True
 
