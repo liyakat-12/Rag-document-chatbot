@@ -296,7 +296,16 @@ async def generate_answer(
     ):
         from backend.app.rag.sentence_select import select_answer_sentences
 
-        selected = select_answer_sentences(question, docs_with_scores)
+        mode = str(getattr(settings, "answer_sentence_select_mode", "term") or "term")
+        max_words = int(getattr(settings, "answer_sentence_max_words", 60) or 60)
+        selected = select_answer_sentences(
+            question,
+            docs_with_scores,
+            max_words=max_words,
+            mode=mode if mode in {
+                "term", "crossencoder", "crossencoder_context", "clean_chunk"
+            } else "term",  # type: ignore[arg-type]
+        )
         generate_answer.last_selection = selected  # type: ignore[attr-defined]
         tokens = count_tokens(question) + count_tokens(selected.answer)
         return selected.answer, tokens
@@ -406,18 +415,24 @@ def build_qa_result(
         from backend.app.rag.sentence_select import highlight_sentences_in_chunk
 
         sent_texts = [s.text for s in selection.sentences]
-        # Per-sentence citations first
         sentence_cites = selection.citation_dicts()
-        # Context preview: first retrieved chunk with highlights (not verbatim answer dump)
+        ctx_body = getattr(selection, "context_chunk", "") or ""
+        if not ctx_body and docs_with_scores:
+            ctx_body = docs_with_scores[0][0].page_content or ""
         if docs_with_scores:
             doc0, score0 = docs_with_scores[0]
             meta = doc0.metadata or {}
+            highlighted = (
+                ctx_body
+                if ">>>" in (ctx_body or "")
+                else highlight_sentences_in_chunk(ctx_body, sent_texts)
+            )
             ctx = {
                 "document_id": str(meta.get("document_id") or ""),
                 "filename": str(meta.get("filename") or "document.pdf"),
                 "page_number": int(meta.get("page_number") or 1),
                 "chunk_id": str(meta.get("chunk_id") or ""),
-                "content": highlight_sentences_in_chunk(doc0.page_content or "", sent_texts),
+                "content": highlighted,
                 "score": round(float(score0), 4),
                 "location_type": str(meta.get("location_type") or "page"),
                 "location": str(meta.get("location") or meta.get("page_number") or ""),
@@ -425,13 +440,27 @@ def build_qa_result(
                 "context_preview": True,
                 "highlighted_sentences": sent_texts,
             }
-            sources = [ctx] + sentence_cites
+            # Answer shown once above; source is highlighted context (not verbatim answer)
+            sources = [ctx]
+            # Extra retrieved chunks (skip ones that only restate selected sentences)
+            answer_join = " ".join(sent_texts).strip()
+            for c in sentence_cites:
+                body = (c.get("content") or "").strip()
+                if not body or body == answer_join or body in sent_texts:
+                    continue
+                sources.append(c)
+            # Append other retrieved docs (non-top) for multi-doc questions
+            for cite in citations[1:3]:
+                d = cite.model_dump()
+                if d.get("chunk_id") and d.get("chunk_id") != ctx.get("chunk_id"):
+                    sources.append(d)
         else:
             sources = sentence_cites
         retrieval = dict(retrieval or {})
         retrieval["sentence_select"] = {
             "n_sentences": len(selection.sentences),
             "word_count": selection.word_count,
+            "variant": getattr(selection, "variant", ""),
         }
     confidence = compute_confidence(docs_with_scores, answer)
     return {

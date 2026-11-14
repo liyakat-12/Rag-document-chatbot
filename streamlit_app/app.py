@@ -90,8 +90,9 @@ def init_state() -> None:
     for k, v in defaults.items():
         if k not in st.session_state:
             st.session_state[k] = v
-    # Drop legacy nav widget key from earlier sidebar implementations
+    # Drop legacy nav widget keys from earlier sidebar implementations
     st.session_state.pop("nav", None)
+    st.session_state.pop("page_selector", None)
 
 
 def new_chat() -> None:

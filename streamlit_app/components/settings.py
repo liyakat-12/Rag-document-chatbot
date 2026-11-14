@@ -41,6 +41,11 @@ def render_settings(client_factory: Callable, api_base: str) -> None:
 
     st.markdown("### Connection")
     st.code(api_base, language="text")
+    status = st.session_state.get("backend_status") or "—"
+    st.caption(f"UI status: {status} · provider `{provider}`")
+    if st.button("Retry connection", key="settings_health_retry"):
+        st.session_state["_force_health_refresh"] = True
+        st.rerun()
     try:
         ready = client_factory().health()
         st.caption(
@@ -50,10 +55,16 @@ def render_settings(client_factory: Callable, api_base: str) -> None:
     except Exception:
         st.warning("Backend not reachable from this UI.")
 
-    st.info(
-        "External LLM providers send retrieved context to the configured API. "
-        "Extractive mode keeps answering fully local."
-    )
+    if provider == "extractive":
+        st.info(
+            "Offline extractive mode — answers are built from retrieved passages "
+            "(no external LLM). Set `LLM_PROVIDER=openai` in `.env` for synthesis."
+        )
+    else:
+        st.info(
+            "External LLM providers send retrieved context to the configured API. "
+            "Extractive mode keeps answering fully local."
+        )
 
     with st.expander("Advanced configuration", expanded=False):
         st.markdown(

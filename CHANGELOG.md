@@ -5,6 +5,30 @@ Format inspired by Keep a Changelog. Newest first.
 
 ## [Unreleased]
 
+### Changed — Dark mode CSS tokens (`chat-screen`)
+- All UI colours in `styles/styles.css` light/dark `@@tokens`; structure uses variables only;
+  token-leak unit test; Streamlit widgets themed via `data-testid`; dark borders `#64748B`;
+  scope shown once; heading-based starter questions.
+
+### Changed — Chat screen redesign (`chat-screen`)
+- Centred ~760px column; sticky composer aligned; Streamlit header hidden; AA contrast
+  (navy primary, darker secondary text); Offline status dot; scope chip above input;
+  nav icons (Chat/Library/About); library/recent one-line truncation; user teal bubble;
+  assistant card with hover copy/regenerate. UI-only — retrieval/answers unchanged.
+
+### Added — Answer quality (`answer-quality`)
+- Deterministic RRF near-tie break: fused score → FAISS/dense score → `chunk_id`
+  (snapshot re-run 3× stable; no snapshot re-record needed).
+- Sentence splitter protects decimals, %, abbreviations (B.Tech, Rs., e.g., No.),
+  dates/codes, and `R² = 0.69`; unit tests in `test_sentence_select`.
+- Answer variants (flags default off): `term` / `crossencoder` /
+  `crossencoder_context` / `clean_chunk` via `answer_sentence_select_mode` +
+  `answer_sentence_max_words`; ablation rows in `evals/ablation_runner.py`.
+- UI: plain “Found in N document(s)” badge; scores only under Advanced details
+  when `ui_developer_mode`; sources collapsed with one-line preview + highlight.
+- Fictional resume fixture `tests/fixtures/fictional_resume_jordan_blake.pdf` +
+  10 draft questions; diagnose script `evals/diagnose_sentence_select.py`.
+
 ### Added — Sentence-select extractive (flagged)
 - `answer_sentence_select` (default off): top 2–3 scored sentences, ≤~60 words,
   contact-line filter, per-sentence citations + highlighted context source.

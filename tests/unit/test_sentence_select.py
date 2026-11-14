@@ -21,6 +21,44 @@ def test_split_bullets_and_pipes():
     assert any("Gamma" in p for p in parts)
 
 
+def test_split_preserves_decimals_and_cgpa():
+    text = "Academic record shows CGPA: 7.92 / 10. Next sentence follows."
+    parts = split_into_sentences(text)
+    joined = " ".join(parts)
+    assert "7.92" in joined
+    assert any("CGPA: 7.92 / 10" in p for p in parts)
+
+
+def test_split_preserves_percentages():
+    text = "The fund has an expense ratio of 0.20%. Investors should note the TER."
+    parts = split_into_sentences(text)
+    assert any("0.20%" in p for p in parts)
+    assert not any(p.strip() == "20%" for p in parts)
+
+
+def test_split_preserves_abbreviations():
+    text = "She completed B.Tech in Computer Science. Later she joined the lab."
+    parts = split_into_sentences(text)
+    assert any("B.Tech in Computer Science" in p for p in parts)
+    assert not any(p.strip().startswith("Tech in") for p in parts)
+
+
+def test_split_preserves_r_squared():
+    text = "Model fit reached R² = 0.69. Further gains were limited."
+    parts = split_into_sentences(text)
+    assert any("R² = 0.69" in p or "R2 = 0.69" in p.replace("²", "2") for p in parts)
+    assert any("0.69" in p for p in parts)
+
+
+def test_split_preserves_fund_code():
+    text = (
+        "The scheme code is HDFC/O/E/MIF/07/04/0015 on the cover. "
+        "See particulars for category."
+    )
+    parts = split_into_sentences(text)
+    assert any("HDFC/O/E/MIF/07/04/0015" in p for p in parts)
+
+
 def test_drop_contact_unless_asked():
     docs = [
         (

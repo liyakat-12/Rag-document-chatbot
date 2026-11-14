@@ -131,11 +131,18 @@ def reciprocal_rank_fusion(
     ranked_lists: list[list[tuple[LCDocument, float]]],
     k: int = RRF_K,
     weights: list[float] | None = None,
+    *,
+    dense_list_index: int = 0,
 ) -> list[tuple[LCDocument, float]]:
     """
     Combine multiple ranked lists via Reciprocal Rank Fusion.
 
     score(d) = sum_i  weight_i / (k + rank_i(d))
+
+    Near-ties are broken deterministically by:
+    (1) fused RRF score desc, (2) FAISS/dense raw score desc, (3) chunk_id asc.
+    ``dense_list_index`` selects which input list supplies the FAISS score
+    (default 0 = first list, matching hybrid_search call order).
     """
     if weights is None:
         weights = [1.0] * len(ranked_lists)
@@ -143,13 +150,24 @@ def reciprocal_rank_fusion(
         raise ValueError("weights length must match ranked_lists length")
 
     scores: dict[str, float] = {}
+    dense_scores: dict[str, float] = {}
     docs: dict[str, LCDocument] = {}
-    for list_weight, ranked in zip(weights, ranked_lists):
-        for rank, (doc, _) in enumerate(ranked):
+    for li, (list_weight, ranked) in enumerate(zip(weights, ranked_lists)):
+        for rank, (doc, raw_score) in enumerate(ranked):
             key = _doc_key(doc)
             scores[key] = scores.get(key, 0.0) + float(list_weight) * (1.0 / (k + rank + 1))
             docs[key] = doc
-    fused = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+            if li == dense_list_index:
+                # Keep the best dense score if a doc appears once
+                dense_scores[key] = max(dense_scores.get(key, float("-inf")), float(raw_score))
+    fused = sorted(
+        scores.items(),
+        key=lambda item: (
+            -item[1],
+            -dense_scores.get(item[0], 0.0),
+            item[0],
+        ),
+    )
     return [(docs[key], score) for key, score in fused]
 
 

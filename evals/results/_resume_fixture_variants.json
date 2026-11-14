@@ -1,0 +1,633 @@
+{
+  "generated_at": "2026-11-14T06:56:45.316022+00:00",
+  "fixture": "fictional_resume_jordan_blake.pdf",
+  "label": "DRAFT / MANUAL FIXTURE \u2014 NOT FOR REPORTING",
+  "variants": {
+    "default": {
+      "n": 10,
+      "key_fact_coverage": 0.75,
+      "avg_answer_words": 128.4,
+      "answerable_hit_rate": 0.75,
+      "near_miss_soft_ok": 0.0,
+      "label": "DRAFT / MANUAL FIXTURE \u2014 NOT FOR REPORTING"
+    },
+    "sentence_term_60": {
+      "n": 10,
+      "key_fact_coverage": 0.625,
+      "avg_answer_words": 25.5,
+      "answerable_hit_rate": 0.625,
+      "near_miss_soft_ok": 1.0,
+      "label": "DRAFT / MANUAL FIXTURE \u2014 NOT FOR REPORTING"
+    },
+    "sentence_term_100": {
+      "n": 10,
+      "key_fact_coverage": 0.625,
+      "avg_answer_words": 25.5,
+      "answerable_hit_rate": 0.625,
+      "near_miss_soft_ok": 1.0,
+      "label": "DRAFT / MANUAL FIXTURE \u2014 NOT FOR REPORTING"
+    },
+    "sentence_crossencoder_60": {
+      "n": 10,
+      "key_fact_coverage": 0.875,
+      "avg_answer_words": 18.0,
+      "answerable_hit_rate": 0.875,
+      "near_miss_soft_ok": 1.0,
+      "label": "DRAFT / MANUAL FIXTURE \u2014 NOT FOR REPORTING"
+    },
+    "sentence_crossencoder_100": {
+      "n": 10,
+      "key_fact_coverage": 0.875,
+      "avg_answer_words": 18.0,
+      "answerable_hit_rate": 0.875,
+      "near_miss_soft_ok": 1.0,
+      "label": "DRAFT / MANUAL FIXTURE \u2014 NOT FOR REPORTING"
+    },
+    "sentence_crossencoder_context_60": {
+      "n": 10,
+      "key_fact_coverage": 0.875,
+      "avg_answer_words": 44.4,
+      "answerable_hit_rate": 0.875,
+      "near_miss_soft_ok": 0.5,
+      "label": "DRAFT / MANUAL FIXTURE \u2014 NOT FOR REPORTING"
+    },
+    "sentence_crossencoder_context_100": {
+      "n": 10,
+      "key_fact_coverage": 0.875,
+      "avg_answer_words": 44.4,
+      "answerable_hit_rate": 0.875,
+      "near_miss_soft_ok": 0.5,
+      "label": "DRAFT / MANUAL FIXTURE \u2014 NOT FOR REPORTING"
+    },
+    "clean_chunk": {
+      "n": 10,
+      "key_fact_coverage": 0.6875,
+      "avg_answer_words": 103.2,
+      "answerable_hit_rate": 0.75,
+      "near_miss_soft_ok": 0.0,
+      "label": "DRAFT / MANUAL FIXTURE \u2014 NOT FOR REPORTING"
+    }
+  },
+  "answers": [
+    {
+      "variant": "default",
+      "id": "fr_q1_name",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (extractive \u00b7 offline)\n\n- Fund Code Parser: extracted codes like HDFC/O/E/MIF/07/04/0015 from SIDs. - Campus Portal: cut average page load from 2.4 s to 1.1 s for 4,500 users. Education\nB.Tech in Computer Scie",
+      "words": 114
+    },
+    {
+      "variant": "default",
+      "id": "fr_q2_cgpa",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (extractive \u00b7 offline)\n\nJordan Blake\nCityville, ST 00000 \u00b7 jordan.blake.example@mail.test \u00b7 LinkedIn | Github\nSummary\nSoftware engineer with hands-on experience in retrieval systems and data pipelines. Built a",
+      "words": 130
+    },
+    {
+      "variant": "default",
+      "id": "fr_q3_degree",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (extractive \u00b7 offline)\n\nJordan Blake\nCityville, ST 00000 \u00b7 jordan.blake.example@mail.test \u00b7 LinkedIn | Github\nSummary\nSoftware engineer with hands-on experience in retrieval systems and data pipelines. Built a",
+      "words": 130
+    },
+    {
+      "variant": "default",
+      "id": "fr_q4_r2",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (extractive \u00b7 offline)\n\nJordan Blake\nCityville, ST 00000 \u00b7 jordan.blake.example@mail.test \u00b7 LinkedIn | Github\nSummary\nSoftware engineer with hands-on experience in retrieval systems and data pipelines. Built a",
+      "words": 130
+    },
+    {
+      "variant": "default",
+      "id": "fr_q5_etl",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (extractive \u00b7 offline)\n\nJordan Blake\nCityville, ST 00000 \u00b7 jordan.blake.example@mail.test \u00b7 LinkedIn | Github\nSummary\nSoftware engineer with hands-on experience in retrieval systems and data pipelines. Built a",
+      "words": 130
+    },
+    {
+      "variant": "default",
+      "id": "fr_q6_expense",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (extractive \u00b7 offline)\n\nJordan Blake\nCityville, ST 00000 \u00b7 jordan.blake.example@mail.test \u00b7 LinkedIn | Github\nSummary\nSoftware engineer with hands-on experience in retrieval systems and data pipelines. Built a",
+      "words": 130
+    },
+    {
+      "variant": "default",
+      "id": "fr_q7_fund_code",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (extractive \u00b7 offline)\n\nJordan Blake\nCityville, ST 00000 \u00b7 jordan.blake.example@mail.test \u00b7 LinkedIn | Github\nSummary\nSoftware engineer with hands-on experience in retrieval systems and data pipelines. Built a",
+      "words": 130
+    },
+    {
+      "variant": "default",
+      "id": "fr_q8_skills",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (extractive \u00b7 offline)\n\nJordan Blake\nCityville, ST 00000 \u00b7 jordan.blake.example@mail.test \u00b7 LinkedIn | Github\nSummary\nSoftware engineer with hands-on experience in retrieval systems and data pipelines. Built a",
+      "words": 130
+    },
+    {
+      "variant": "default",
+      "id": "fr_q9_near_miss_salary",
+      "answerable": false,
+      "answer_preview": "**Answer from your documents** (extractive \u00b7 offline)\n\nJordan Blake\nCityville, ST 00000 \u00b7 jordan.blake.example@mail.test \u00b7 LinkedIn | Github\nSummary\nSoftware engineer with hands-on experience in retrieval systems and data pipelines. Built a",
+      "words": 130
+    },
+    {
+      "variant": "default",
+      "id": "fr_q10_near_miss_phd",
+      "answerable": false,
+      "answer_preview": "**Answer from your documents** (extractive \u00b7 offline)\n\nJordan Blake\nCityville, ST 00000 \u00b7 jordan.blake.example@mail.test \u00b7 LinkedIn | Github\nSummary\nSoftware engineer with hands-on experience in retrieval systems and data pipelines. Built a",
+      "words": 130
+    },
+    {
+      "variant": "sentence_term_60",
+      "id": "fr_q1_name",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (term \u00b7 offline)\n\nThesis on sentence selection for extractive QA; reported R2 = 0.69 on a held-out set. Software engineer with hands-on experience in retrieval systems and data pipelines.",
+      "words": 33
+    },
+    {
+      "variant": "sentence_term_60",
+      "id": "fr_q2_cgpa",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (term \u00b7 offline)\n\nprototype with R2 = 0.69 relevance correlation and a CGPA: 7.92 / 10 academic record.",
+      "words": 22
+    },
+    {
+      "variant": "sentence_term_60",
+      "id": "fr_q3_degree",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (term \u00b7 offline)\n\nJordan Blake",
+      "words": 9
+    },
+    {
+      "variant": "sentence_term_60",
+      "id": "fr_q4_r2",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (term \u00b7 offline)\n\nprototype with R2 = 0.69 relevance correlation and a CGPA: 7.92 / 10 academic record. extractive QA; reported R2 = 0.69 on a held-out set.",
+      "words": 32
+    },
+    {
+      "variant": "sentence_term_60",
+      "id": "fr_q5_etl",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (term \u00b7 offline)\n\nIntern, Northwind Analytics (Jun 2023 - Aug 2023). Reduced batch ETL runtime by 35% and documented a scholarship (different context from the ETL 35% runtime reduction above).",
+      "words": 34
+    },
+    {
+      "variant": "sentence_term_60",
+      "id": "fr_q6_expense",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (term \u00b7 offline)\n\nSoftware engineer with hands-on experience in retrieval systems and data pipelines. scheme expense ratio of 0.20% for an internal fund dashboard demo.",
+      "words": 29
+    },
+    {
+      "variant": "sentence_term_60",
+      "id": "fr_q7_fund_code",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (term \u00b7 offline)\n\nscheme expense ratio of 0.20% for an internal fund dashboard demo. Fund Code Parser: extracted codes like HDFC/O/E/MIF/07/04/0015 from SIDs. Fund Code Parser: extracted codes like HDFC/O/E/MI",
+      "words": 36
+    },
+    {
+      "variant": "sentence_term_60",
+      "id": "fr_q8_skills",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (term \u00b7 offline)\n\nBuilt an internal search Latency Board: tracked p95 chat latency under 800 ms across 10k queries.",
+      "words": 23
+    },
+    {
+      "variant": "sentence_term_60",
+      "id": "fr_q9_near_miss_salary",
+      "answerable": false,
+      "answer_preview": "**Answer from your documents** (term \u00b7 offline)\n\nJordan Blake Intern, Contoso Labs (Jan 2024 - May 2024).",
+      "words": 17
+    },
+    {
+      "variant": "sentence_term_60",
+      "id": "fr_q10_near_miss_phd",
+      "answerable": false,
+      "answer_preview": "**Answer from your documents** (term \u00b7 offline)\n\nJordan Blake Software engineer with hands-on experience in retrieval systems and data pipelines.",
+      "words": 20
+    },
+    {
+      "variant": "sentence_term_100",
+      "id": "fr_q1_name",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (term \u00b7 offline)\n\nThesis on sentence selection for extractive QA; reported R2 = 0.69 on a held-out set. Software engineer with hands-on experience in retrieval systems and data pipelines.",
+      "words": 33
+    },
+    {
+      "variant": "sentence_term_100",
+      "id": "fr_q2_cgpa",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (term \u00b7 offline)\n\nprototype with R2 = 0.69 relevance correlation and a CGPA: 7.92 / 10 academic record.",
+      "words": 22
+    },
+    {
+      "variant": "sentence_term_100",
+      "id": "fr_q3_degree",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (term \u00b7 offline)\n\nJordan Blake",
+      "words": 9
+    },
+    {
+      "variant": "sentence_term_100",
+      "id": "fr_q4_r2",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (term \u00b7 offline)\n\nprototype with R2 = 0.69 relevance correlation and a CGPA: 7.92 / 10 academic record. extractive QA; reported R2 = 0.69 on a held-out set.",
+      "words": 32
+    },
+    {
+      "variant": "sentence_term_100",
+      "id": "fr_q5_etl",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (term \u00b7 offline)\n\nIntern, Northwind Analytics (Jun 2023 - Aug 2023). Reduced batch ETL runtime by 35% and documented a scholarship (different context from the ETL 35% runtime reduction above).",
+      "words": 34
+    },
+    {
+      "variant": "sentence_term_100",
+      "id": "fr_q6_expense",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (term \u00b7 offline)\n\nSoftware engineer with hands-on experience in retrieval systems and data pipelines. scheme expense ratio of 0.20% for an internal fund dashboard demo.",
+      "words": 29
+    },
+    {
+      "variant": "sentence_term_100",
+      "id": "fr_q7_fund_code",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (term \u00b7 offline)\n\nscheme expense ratio of 0.20% for an internal fund dashboard demo. Fund Code Parser: extracted codes like HDFC/O/E/MIF/07/04/0015 from SIDs. Fund Code Parser: extracted codes like HDFC/O/E/MI",
+      "words": 36
+    },
+    {
+      "variant": "sentence_term_100",
+      "id": "fr_q8_skills",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (term \u00b7 offline)\n\nBuilt an internal search Latency Board: tracked p95 chat latency under 800 ms across 10k queries.",
+      "words": 23
+    },
+    {
+      "variant": "sentence_term_100",
+      "id": "fr_q9_near_miss_salary",
+      "answerable": false,
+      "answer_preview": "**Answer from your documents** (term \u00b7 offline)\n\nJordan Blake Intern, Contoso Labs (Jan 2024 - May 2024).",
+      "words": 17
+    },
+    {
+      "variant": "sentence_term_100",
+      "id": "fr_q10_near_miss_phd",
+      "answerable": false,
+      "answer_preview": "**Answer from your documents** (term \u00b7 offline)\n\nJordan Blake Software engineer with hands-on experience in retrieval systems and data pipelines.",
+      "words": 20
+    },
+    {
+      "variant": "sentence_crossencoder_60",
+      "id": "fr_q1_name",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (crossencoder \u00b7 offline)\n\nEducation Jordan Blake",
+      "words": 10
+    },
+    {
+      "variant": "sentence_crossencoder_60",
+      "id": "fr_q2_cgpa",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (crossencoder \u00b7 offline)\n\nprototype with R2 = 0.69 relevance correlation and a CGPA: 7.92 / 10 academic record.",
+      "words": 22
+    },
+    {
+      "variant": "sentence_crossencoder_60",
+      "id": "fr_q3_degree",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (crossencoder \u00b7 offline)\n\nJordan Blake Education",
+      "words": 10
+    },
+    {
+      "variant": "sentence_crossencoder_60",
+      "id": "fr_q4_r2",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (crossencoder \u00b7 offline)\n\nprototype with R2 = 0.69 relevance correlation and a CGPA: 7.92 / 10 academic record. extractive QA; reported R2 = 0.69 on a held-out set.",
+      "words": 32
+    },
+    {
+      "variant": "sentence_crossencoder_60",
+      "id": "fr_q5_etl",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (crossencoder \u00b7 offline)\n\nReduced batch ETL runtime by 35% and documented a",
+      "words": 16
+    },
+    {
+      "variant": "sentence_crossencoder_60",
+      "id": "fr_q6_expense",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (crossencoder \u00b7 offline)\n\nInternships scheme expense ratio of 0.20% for an internal fund dashboard demo.",
+      "words": 19
+    },
+    {
+      "variant": "sentence_crossencoder_60",
+      "id": "fr_q7_fund_code",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (crossencoder \u00b7 offline)\n\nFund Code Parser: extracted codes like HDFC/O/E/MIF/07/04/0015 from SIDs. Fund Code Parser: extracted codes like HDFC/O/E/MIF/07/04/0015 from SIDs.",
+      "words": 25
+    },
+    {
+      "variant": "sentence_crossencoder_60",
+      "id": "fr_q8_skills",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (crossencoder \u00b7 offline)\n\nBuilt an internal search Python, FastAPI, FAISS, BM25, Streamlit, SQLite, pytest, Docker.",
+      "words": 19
+    },
+    {
+      "variant": "sentence_crossencoder_60",
+      "id": "fr_q9_near_miss_salary",
+      "answerable": false,
+      "answer_preview": "**Answer from your documents** (crossencoder \u00b7 offline)\n\nJordan Blake Intern, Contoso Labs (Jan 2024 - May 2024).",
+      "words": 17
+    },
+    {
+      "variant": "sentence_crossencoder_60",
+      "id": "fr_q10_near_miss_phd",
+      "answerable": false,
+      "answer_preview": "**Answer from your documents** (crossencoder \u00b7 offline)\n\nJordan Blake Education",
+      "words": 10
+    },
+    {
+      "variant": "sentence_crossencoder_100",
+      "id": "fr_q1_name",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (crossencoder \u00b7 offline)\n\nEducation Jordan Blake",
+      "words": 10
+    },
+    {
+      "variant": "sentence_crossencoder_100",
+      "id": "fr_q2_cgpa",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (crossencoder \u00b7 offline)\n\nprototype with R2 = 0.69 relevance correlation and a CGPA: 7.92 / 10 academic record.",
+      "words": 22
+    },
+    {
+      "variant": "sentence_crossencoder_100",
+      "id": "fr_q3_degree",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (crossencoder \u00b7 offline)\n\nJordan Blake Education",
+      "words": 10
+    },
+    {
+      "variant": "sentence_crossencoder_100",
+      "id": "fr_q4_r2",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (crossencoder \u00b7 offline)\n\nprototype with R2 = 0.69 relevance correlation and a CGPA: 7.92 / 10 academic record. extractive QA; reported R2 = 0.69 on a held-out set.",
+      "words": 32
+    },
+    {
+      "variant": "sentence_crossencoder_100",
+      "id": "fr_q5_etl",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (crossencoder \u00b7 offline)\n\nReduced batch ETL runtime by 35% and documented a",
+      "words": 16
+    },
+    {
+      "variant": "sentence_crossencoder_100",
+      "id": "fr_q6_expense",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (crossencoder \u00b7 offline)\n\nInternships scheme expense ratio of 0.20% for an internal fund dashboard demo.",
+      "words": 19
+    },
+    {
+      "variant": "sentence_crossencoder_100",
+      "id": "fr_q7_fund_code",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (crossencoder \u00b7 offline)\n\nFund Code Parser: extracted codes like HDFC/O/E/MIF/07/04/0015 from SIDs. Fund Code Parser: extracted codes like HDFC/O/E/MIF/07/04/0015 from SIDs.",
+      "words": 25
+    },
+    {
+      "variant": "sentence_crossencoder_100",
+      "id": "fr_q8_skills",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (crossencoder \u00b7 offline)\n\nBuilt an internal search Python, FastAPI, FAISS, BM25, Streamlit, SQLite, pytest, Docker.",
+      "words": 19
+    },
+    {
+      "variant": "sentence_crossencoder_100",
+      "id": "fr_q9_near_miss_salary",
+      "answerable": false,
+      "answer_preview": "**Answer from your documents** (crossencoder \u00b7 offline)\n\nJordan Blake Intern, Contoso Labs (Jan 2024 - May 2024).",
+      "words": 17
+    },
+    {
+      "variant": "sentence_crossencoder_100",
+      "id": "fr_q10_near_miss_phd",
+      "answerable": false,
+      "answer_preview": "**Answer from your documents** (crossencoder \u00b7 offline)\n\nJordan Blake Education",
+      "words": 10
+    },
+    {
+      "variant": "sentence_crossencoder_context_60",
+      "id": "fr_q1_name",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (crossencoder_context \u00b7 offline)\n\nCampus Portal: cut average page load from 2.4 s to 1.1 s for 4,500 users. Education B.Tech in Computer Science, Riverview Institute of Technology (2020-2024). Jordan Blake Cit",
+      "words": 41
+    },
+    {
+      "variant": "sentence_crossencoder_context_60",
+      "id": "fr_q2_cgpa",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (crossencoder_context \u00b7 offline)\n\nBuilt an internal search prototype with R2 = 0.69 relevance correlation and a CGPA: 7.92 / 10 academic record. Internships",
+      "words": 27
+    },
+    {
+      "variant": "sentence_crossencoder_context_60",
+      "id": "fr_q3_degree",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (crossencoder_context \u00b7 offline)\n\nJordan Blake Cityville, ST 00000 \u00b7 jordan.blake.example@mail.test \u00b7 LinkedIn Campus Portal: cut average page load from 2.4 s to 1.1 s for 4,500 users. Education",
+      "words": 32
+    },
+    {
+      "variant": "sentence_crossencoder_context_60",
+      "id": "fr_q4_r2",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (crossencoder_context \u00b7 offline)\n\nBuilt an internal search prototype with R2 = 0.69 relevance correlation and a CGPA: 7.92 / 10 academic record. Internships Thesis on sentence selection for extractive QA; repo",
+      "words": 51
+    },
+    {
+      "variant": "sentence_crossencoder_context_60",
+      "id": "fr_q5_etl",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (crossencoder_context \u00b7 offline)\n\nIntern, Northwind Analytics (Jun 2023 - Aug 2023). Reduced batch ETL runtime by 35% and documented a scheme expense ratio of 0.20% for an internal fund dashboard demo.",
+      "words": 35
+    },
+    {
+      "variant": "sentence_crossencoder_context_60",
+      "id": "fr_q6_expense",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (crossencoder_context \u00b7 offline)\n\nprototype with R2 = 0.69 relevance correlation and a CGPA: 7.92 / 10 academic record. Internships Intern, Northwind Analytics (Jun 2023 - Aug 2023). Reduced batch ETL runtime ",
+      "words": 59
+    },
+    {
+      "variant": "sentence_crossencoder_context_60",
+      "id": "fr_q7_fund_code",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (crossencoder_context \u00b7 offline)\n\nLatency Board: tracked p95 chat latency under 800 ms across 10k queries. Fund Code Parser: extracted codes like HDFC/O/E/MIF/07/04/0015 from SIDs. Campus Portal: cut average p",
+      "words": 67
+    },
+    {
+      "variant": "sentence_crossencoder_context_60",
+      "id": "fr_q8_skills",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (crossencoder_context \u00b7 offline)\n\nSoftware engineer with hands-on experience in retrieval systems and data pipelines. Built an internal search prototype with R2 = 0.69 relevance correlation and a CGPA: 7.92 / ",
+      "words": 55
+    },
+    {
+      "variant": "sentence_crossencoder_context_60",
+      "id": "fr_q9_near_miss_salary",
+      "answerable": false,
+      "answer_preview": "**Answer from your documents** (crossencoder_context \u00b7 offline)\n\nJordan Blake Cityville, ST 00000 \u00b7 jordan.blake.example@mail.test \u00b7 LinkedIn scheme expense ratio of 0.20% for an internal fund dashboard demo. Intern, Contoso Labs (Jan 2024 ",
+      "words": 45
+    },
+    {
+      "variant": "sentence_crossencoder_context_60",
+      "id": "fr_q10_near_miss_phd",
+      "answerable": false,
+      "answer_preview": "**Answer from your documents** (crossencoder_context \u00b7 offline)\n\nJordan Blake Cityville, ST 00000 \u00b7 jordan.blake.example@mail.test \u00b7 LinkedIn Campus Portal: cut average page load from 2.4 s to 1.1 s for 4,500 users. Education",
+      "words": 32
+    },
+    {
+      "variant": "sentence_crossencoder_context_100",
+      "id": "fr_q1_name",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (crossencoder_context \u00b7 offline)\n\nCampus Portal: cut average page load from 2.4 s to 1.1 s for 4,500 users. Education B.Tech in Computer Science, Riverview Institute of Technology (2020-2024). Jordan Blake Cit",
+      "words": 41
+    },
+    {
+      "variant": "sentence_crossencoder_context_100",
+      "id": "fr_q2_cgpa",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (crossencoder_context \u00b7 offline)\n\nBuilt an internal search prototype with R2 = 0.69 relevance correlation and a CGPA: 7.92 / 10 academic record. Internships",
+      "words": 27
+    },
+    {
+      "variant": "sentence_crossencoder_context_100",
+      "id": "fr_q3_degree",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (crossencoder_context \u00b7 offline)\n\nJordan Blake Cityville, ST 00000 \u00b7 jordan.blake.example@mail.test \u00b7 LinkedIn Campus Portal: cut average page load from 2.4 s to 1.1 s for 4,500 users. Education",
+      "words": 32
+    },
+    {
+      "variant": "sentence_crossencoder_context_100",
+      "id": "fr_q4_r2",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (crossencoder_context \u00b7 offline)\n\nBuilt an internal search prototype with R2 = 0.69 relevance correlation and a CGPA: 7.92 / 10 academic record. Internships Thesis on sentence selection for extractive QA; repo",
+      "words": 51
+    },
+    {
+      "variant": "sentence_crossencoder_context_100",
+      "id": "fr_q5_etl",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (crossencoder_context \u00b7 offline)\n\nIntern, Northwind Analytics (Jun 2023 - Aug 2023). Reduced batch ETL runtime by 35% and documented a scheme expense ratio of 0.20% for an internal fund dashboard demo.",
+      "words": 35
+    },
+    {
+      "variant": "sentence_crossencoder_context_100",
+      "id": "fr_q6_expense",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (crossencoder_context \u00b7 offline)\n\nprototype with R2 = 0.69 relevance correlation and a CGPA: 7.92 / 10 academic record. Internships Intern, Northwind Analytics (Jun 2023 - Aug 2023). Reduced batch ETL runtime ",
+      "words": 59
+    },
+    {
+      "variant": "sentence_crossencoder_context_100",
+      "id": "fr_q7_fund_code",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (crossencoder_context \u00b7 offline)\n\nLatency Board: tracked p95 chat latency under 800 ms across 10k queries. Fund Code Parser: extracted codes like HDFC/O/E/MIF/07/04/0015 from SIDs. Campus Portal: cut average p",
+      "words": 67
+    },
+    {
+      "variant": "sentence_crossencoder_context_100",
+      "id": "fr_q8_skills",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (crossencoder_context \u00b7 offline)\n\nSoftware engineer with hands-on experience in retrieval systems and data pipelines. Built an internal search prototype with R2 = 0.69 relevance correlation and a CGPA: 7.92 / ",
+      "words": 55
+    },
+    {
+      "variant": "sentence_crossencoder_context_100",
+      "id": "fr_q9_near_miss_salary",
+      "answerable": false,
+      "answer_preview": "**Answer from your documents** (crossencoder_context \u00b7 offline)\n\nJordan Blake Cityville, ST 00000 \u00b7 jordan.blake.example@mail.test \u00b7 LinkedIn scheme expense ratio of 0.20% for an internal fund dashboard demo. Intern, Contoso Labs (Jan 2024 ",
+      "words": 45
+    },
+    {
+      "variant": "sentence_crossencoder_context_100",
+      "id": "fr_q10_near_miss_phd",
+      "answerable": false,
+      "answer_preview": "**Answer from your documents** (crossencoder_context \u00b7 offline)\n\nJordan Blake Cityville, ST 00000 \u00b7 jordan.blake.example@mail.test \u00b7 LinkedIn Campus Portal: cut average page load from 2.4 s to 1.1 s for 4,500 users. Education",
+      "words": 32
+    },
+    {
+      "variant": "clean_chunk",
+      "id": "fr_q1_name",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (clean_chunk \u00b7 offline)\n\nFund Code Parser: extracted codes like HDFC/O/E/MIF/07/04/0015 from SIDs. Campus Portal: cut average page load from 2.4 s to 1.1 s for 4,500 users. Education extractive QA; reported R2",
+      "words": 69
+    },
+    {
+      "variant": "clean_chunk",
+      "id": "fr_q2_cgpa",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (clean_chunk \u00b7 offline)\n\nJordan Blake Software engineer with hands-on experience in retrieval systems and data pipelines. Built an internal search prototype with R2 = 0.69 relevance correlation and a CGPA: 7.9",
+      "words": 107
+    },
+    {
+      "variant": "clean_chunk",
+      "id": "fr_q3_degree",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (clean_chunk \u00b7 offline)\n\nJordan Blake Software engineer with hands-on experience in retrieval systems and data pipelines. Built an internal search prototype with R2 = 0.69 relevance correlation and a CGPA: 7.9",
+      "words": 107
+    },
+    {
+      "variant": "clean_chunk",
+      "id": "fr_q4_r2",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (clean_chunk \u00b7 offline)\n\nJordan Blake Software engineer with hands-on experience in retrieval systems and data pipelines. Built an internal search prototype with R2 = 0.69 relevance correlation and a CGPA: 7.9",
+      "words": 107
+    },
+    {
+      "variant": "clean_chunk",
+      "id": "fr_q5_etl",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (clean_chunk \u00b7 offline)\n\nJordan Blake Software engineer with hands-on experience in retrieval systems and data pipelines. Built an internal search prototype with R2 = 0.69 relevance correlation and a CGPA: 7.9",
+      "words": 107
+    },
+    {
+      "variant": "clean_chunk",
+      "id": "fr_q6_expense",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (clean_chunk \u00b7 offline)\n\nJordan Blake Software engineer with hands-on experience in retrieval systems and data pipelines. Built an internal search prototype with R2 = 0.69 relevance correlation and a CGPA: 7.9",
+      "words": 107
+    },
+    {
+      "variant": "clean_chunk",
+      "id": "fr_q7_fund_code",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (clean_chunk \u00b7 offline)\n\nJordan Blake Software engineer with hands-on experience in retrieval systems and data pipelines. Built an internal search prototype with R2 = 0.69 relevance correlation and a CGPA: 7.9",
+      "words": 107
+    },
+    {
+      "variant": "clean_chunk",
+      "id": "fr_q8_skills",
+      "answerable": true,
+      "answer_preview": "**Answer from your documents** (clean_chunk \u00b7 offline)\n\nJordan Blake Software engineer with hands-on experience in retrieval systems and data pipelines. Built an internal search prototype with R2 = 0.69 relevance correlation and a CGPA: 7.9",
+      "words": 107
+    },
+    {
+      "variant": "clean_chunk",
+      "id": "fr_q9_near_miss_salary",
+      "answerable": false,
+      "answer_preview": "**Answer from your documents** (clean_chunk \u00b7 offline)\n\nJordan Blake Software engineer with hands-on experience in retrieval systems and data pipelines. Built an internal search prototype with R2 = 0.69 relevance correlation and a CGPA: 7.9",
+      "words": 107
+    },
+    {
+      "variant": "clean_chunk",
+      "id": "fr_q10_near_miss_phd",
+      "answerable": false,
+      "answer_preview": "**Answer from your documents** (clean_chunk \u00b7 offline)\n\nJordan Blake Software engineer with hands-on experience in retrieval systems and data pipelines. Built an internal search prototype with R2 = 0.69 relevance correlation and a CGPA: 7.9",
+      "words": 107
+    }
+  ]
+}

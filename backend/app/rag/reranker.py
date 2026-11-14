@@ -40,6 +40,11 @@ def _load_model():
             return None
 
 
+def get_cross_encoder():
+    """Public lazy accessor for sentence scoring (may return None)."""
+    return _load_model()
+
+
 def rerank_candidates(
     query: str,
     candidates: list[tuple[LCDocument, float]],

@@ -12,11 +12,12 @@ from components import friendly_error
 from components.citation_viewer import render_citation_viewer_panel
 from components.sources import render_confidence, render_retrieval_details, render_sources
 
-SUGGESTIONS = [
+# Fallback only — prefer heading-derived starters from components.headings
+_FALLBACK_SUGGESTIONS = [
     "What is this document about?",
-    "Summarize the key points.",
-    "List important names, skills, or dates.",
-    "What information is missing or unclear?",
+    "List the main section headings in this document.",
+    "What names, dates, or numbers appear near the start?",
+    "Which sections cover skills or experience?",
 ]
 
 NOT_FOUND_SNIPPET = "couldn't find that information"
@@ -99,9 +100,10 @@ def render_empty_library(*, max_mb: int = 40) -> None:
 def render_welcome_with_docs(
     on_suggest: Callable[[str], None],
     *,
-    mode_note: str = "",
-    scope_caption: str = "",
+    docs: list[dict[str, Any]] | None = None,
 ) -> None:
+    from components.headings import starters_for_docs
+
     st.markdown(
         """
         <div class="hero-wrap">
@@ -115,20 +117,71 @@ def render_welcome_with_docs(
         """,
         unsafe_allow_html=True,
     )
-    if scope_caption:
-        st.markdown(f'<p class="scope-hint">{scope_caption}</p>', unsafe_allow_html=True)
-    if mode_note:
-        st.markdown(f'<div class="mode-banner">{mode_note}</div>', unsafe_allow_html=True)
-
     st.markdown(
         '<p class="nav-hint" style="text-align:center;margin-top:0.25rem;">Try a question</p>',
         unsafe_allow_html=True,
     )
+    scoped_ids = set(st.session_state.get("selected_document_ids") or [])
+    pool = docs or []
+    if scoped_ids:
+        pool = [d for d in pool if d.get("id") in scoped_ids] or pool
+    suggestions = starters_for_docs(pool) or list(_FALLBACK_SUGGESTIONS)
     cols = st.columns(2)
-    for i, q in enumerate(SUGGESTIONS):
+    for i, q in enumerate(suggestions):
         with cols[i % 2]:
             if st.button(q, key=f"suggest_{i}", use_container_width=True):
                 on_suggest(q)
+
+
+def _display_answer(content: str) -> str:
+    """Strip developer mode tags from answer headers (UI only)."""
+    import re
+
+    text = content or ""
+    text = re.sub(
+        r"(\*\*Answer from your documents\*\*|^\*\*Document summary\*\*)"
+        r"\s*\([^)]*offline[^)]*\)\s*",
+        r"\1\n\n",
+        text,
+        flags=re.I | re.M,
+    )
+    text = re.sub(
+        r"\(extractive\s*·\s*offline[^)]*\)",
+        "",
+        text,
+        flags=re.I,
+    )
+    return text.strip()
+
+
+def _render_scope_chip(docs: list[dict[str, Any]]) -> None:
+    """Single scope control above the composer (chip label = only scope UI)."""
+    if not docs:
+        return
+    from components import truncate_at_word
+
+    seen: dict[str, int] = {}
+    label_to_id = {_doc_label(d, seen): d["id"] for d in docs}
+    current_ids = set(st.session_state.get("selected_document_ids") or [])
+    default_labels = [lab for lab, did in label_to_id.items() if did in current_ids]
+    if default_labels:
+        if len(default_labels) == 1:
+            chip = f"Searching: {truncate_at_word(default_labels[0], 36)} ▾"
+        else:
+            chip = f"Searching: {len(default_labels)} documents ▾"
+    else:
+        chip = f"All documents ({len(docs)}) ▾"
+    # One control only — no separate "Scoped to N of M" caption
+    with st.popover(chip, use_container_width=True):
+        chosen = st.multiselect(
+            "Documents",
+            options=list(label_to_id.keys()),
+            default=default_labels,
+            help="Leave empty to search all indexed documents.",
+            key="search_in_labels",
+            label_visibility="collapsed",
+        )
+        st.session_state.selected_document_ids = [label_to_id[lab] for lab in chosen]
 
 
 def _selected_document_ids() -> list[str] | None:
@@ -251,20 +304,15 @@ def render_chat(client_factory: Callable, *, llm_provider: str = "") -> None:
 
     max_mb = int(os.getenv("MAX_UPLOAD_SIZE_MB", "40"))
     pending = st.session_state.pop("pending_prompt", None)
-    mode_note = ""
-    if llm_provider == "extractive":
-        mode_note = (
-            "Offline extractive mode — answers are built from retrieved passages "
-            "(no external LLM). Switch to <code>openai</code> in Settings/.env for synthesis."
-        )
-    elif llm_provider:
-        mode_note = f"Answering with external provider: <code>{llm_provider}</code>"
+    # Keep provider in session for Settings / status tip (no user-facing banner)
+    if llm_provider:
+        st.session_state.llm_provider = llm_provider
 
     backend_ok = bool(st.session_state.get("backend_ok"))
     if not backend_ok:
         st.warning(
             "Backend unavailable. Chat, upload, and search require the API. "
-            "Use **Retry connection** in the sidebar after starting the backend."
+            "Open **Settings** to retry after starting the backend."
         )
 
     # Document scope — cache list briefly to avoid an HTTP round-trip every Streamlit rerun
@@ -299,27 +347,6 @@ def render_chat(client_factory: Callable, *, llm_provider: str = "") -> None:
         st.session_state._had_stale_scope = False
     elif not selected and st.session_state.get("selected_document_ids"):
         st.session_state._had_stale_scope = True
-
-    scope_caption = ""
-    if docs:
-        seen: dict[str, int] = {}
-        label_to_id = {_doc_label(d, seen): d["id"] for d in docs}
-        current_ids = set(st.session_state.get("selected_document_ids") or [])
-        default_labels = [lab for lab, did in label_to_id.items() if did in current_ids]
-        chosen = st.multiselect(
-            "Search in",
-            options=list(label_to_id.keys()),
-            default=default_labels,
-            help="Leave empty to search all indexed documents. Scope is enforced in retrieval.",
-            key="search_in_labels",
-        )
-        st.session_state.selected_document_ids = [label_to_id[lab] for lab in chosen]
-        if chosen:
-            scope_caption = f"Scoped to {len(chosen)} of {len(docs)} indexed document(s)"
-            st.caption(scope_caption)
-        else:
-            scope_caption = f"Searching all {len(docs)} indexed document(s)"
-            st.caption(scope_caption)
 
     if not docs:
         if not st.session_state.messages and pending is None:
@@ -372,122 +399,126 @@ def render_chat(client_factory: Callable, *, llm_provider: str = "") -> None:
             st.session_state.pending_prompt = q
             st.rerun()
 
-        render_welcome_with_docs(_suggest, mode_note=mode_note, scope_caption=scope_caption)
+        render_welcome_with_docs(_suggest, docs=docs)
     else:
-        if mode_note:
-            st.markdown(f'<div class="mode-banner">{mode_note}</div>', unsafe_allow_html=True)
-
-        tool_cols = st.columns([1, 1, 2])
-        with tool_cols[0]:
-            if st.button("Clear conversation", key="clear_conv", use_container_width=True):
-                st.session_state.messages = []
-                st.session_state.session_id = None
-                st.session_state.pending_prompt = None
-                st.session_state.pop("last_failed_prompt", None)
-                st.session_state["chat_loading"] = False
-                st.rerun()
-
         if st.session_state.get("chat_loading"):
             st.caption("Working…")
 
         for i, msg in enumerate(st.session_state.messages):
             with st.chat_message(msg["role"]):
-                st.markdown(msg["content"])
-                if msg["role"] == "assistant":
-                    is_error = bool(msg.get("is_error")) or bool(
-                        st.session_state.get("last_failed_prompt")
-                        and i == len(st.session_state.messages) - 1
-                        and not msg.get("id")
-                    )
-                    is_greeting = _is_greeting_turn(msg)
-                    is_weak = _is_weak_evidence(msg)
-                    badge = _refusal_badge(msg)
-                    if badge:
-                        label, css = badge
-                        reason = ((msg.get("retrieval") or {}).get("refusal") or {}).get("reason") or ""
-                        st.markdown(
-                            f'<span class="{css}">{label}</span>',
-                            unsafe_allow_html=True,
-                        )
-                        if reason:
-                            st.caption(reason)
+                if msg["role"] != "assistant":
+                    st.markdown(msg["content"])
+                    continue
 
-                    a1, a2, a3 = st.columns([1, 1, 1])
+                is_error = bool(msg.get("is_error")) or bool(
+                    st.session_state.get("last_failed_prompt")
+                    and i == len(st.session_state.messages) - 1
+                    and not msg.get("id")
+                )
+                is_greeting = _is_greeting_turn(msg)
+                is_weak = _is_weak_evidence(msg)
+                badge = _refusal_badge(msg)
+
+                # Card: status → answer → sources → hover actions
+                if badge:
+                    label, css = badge
+                    reason = ((msg.get("retrieval") or {}).get("refusal") or {}).get("reason") or ""
+                    st.markdown(
+                        f'<span class="{css}">{label}</span>',
+                        unsafe_allow_html=True,
+                    )
+                    if reason:
+                        st.caption(reason)
+                elif not is_greeting and not is_error and not is_weak:
+                    render_confidence(
+                        msg.get("confidence"),
+                        sources=msg.get("sources"),
+                    )
+                if msg.get("cached"):
+                    st.markdown('<span class="meta-chip">Cached</span>', unsafe_allow_html=True)
+
+                st.markdown(_display_answer(msg.get("content") or ""))
+
+                if is_greeting or is_error:
+                    prior = _find_prior_user_prompt(st.session_state.messages, i)
+                    st.markdown('<div class="msg-actions">', unsafe_allow_html=True)
+                    a1, a2 = st.columns([1, 1])
                     with a1:
                         st.download_button(
-                            "Copy answer",
+                            "⎘ Copy",
                             data=msg.get("content") or "",
                             file_name="documind-answer.txt",
                             mime="text/plain",
                             key=f"copy_{i}",
-                            use_container_width=True,
                         )
                     with a2:
-                        prior = _find_prior_user_prompt(st.session_state.messages, i)
-                        if prior and st.button(
-                            "Regenerate",
-                            key=f"regen_{i}",
-                            use_container_width=True,
-                        ):
-                            # Drop this assistant (+ its user) and re-ask
-                            st.session_state.messages = st.session_state.messages[: i - 1 if i > 0 else 0]
-                            st.session_state.pending_prompt = prior
-                            st.session_state.pop("last_failed_prompt", None)
+                        if is_error and st.button("↻ Retry", key=f"retry_{i}"):
+                            failed = st.session_state.pop("last_failed_prompt", None)
+                            prompt_retry = failed or prior
+                            if len(st.session_state.messages) >= 2:
+                                st.session_state.messages = st.session_state.messages[:-2]
+                            if prompt_retry:
+                                st.session_state.pending_prompt = prompt_retry
                             st.rerun()
-                    with a3:
-                        if is_error:
-                            if st.button("Retry", key=f"retry_{i}", use_container_width=True):
-                                failed = st.session_state.pop("last_failed_prompt", None)
-                                prompt_retry = failed or prior
-                                if len(st.session_state.messages) >= 2:
-                                    st.session_state.messages = st.session_state.messages[:-2]
-                                if prompt_retry:
-                                    st.session_state.pending_prompt = prompt_retry
-                                st.rerun()
+                    st.markdown("</div>", unsafe_allow_html=True)
+                    continue
 
-                    if msg.get("cached"):
-                        st.markdown('<span class="meta-chip">Cached</span>', unsafe_allow_html=True)
-
-                    # Greetings: answer only — no sources, confidence, or feedback
-                    if is_greeting or is_error:
-                        continue
-
-                    if is_weak:
-                        st.info(
-                            "Insufficient evidence in the indexed documents for this question. "
-                            "Try rephrasing, selecting a different document scope, or uploading "
-                            "a PDF that covers the topic."
-                        )
-                        # Still show sources/previews when present
-                        if msg.get("sources"):
-                            render_sources(msg.get("sources"), msg_index=i)
-                    else:
-                        render_confidence(msg.get("confidence"))
+                if is_weak:
+                    st.info(
+                        "Insufficient evidence in the indexed documents for this question. "
+                        "Try rephrasing, changing scope, or uploading a covering PDF."
+                    )
+                    if msg.get("sources"):
                         render_sources(msg.get("sources"), msg_index=i)
-                        render_retrieval_details(msg.get("retrieval"), msg.get("timings"))
+                else:
+                    render_sources(msg.get("sources"), msg_index=i)
+                    render_retrieval_details(
+                        msg.get("retrieval"),
+                        msg.get("timings"),
+                        sources=msg.get("sources"),
+                    )
+                    if msg.get("id"):
+                        b1, b2, b3 = st.columns([1.2, 1.4, 2])
+                        with b1:
+                            if st.button("Helpful", key=f"up_{i}"):
+                                try:
+                                    client_factory().rate_message(msg["id"], "up")
+                                    st.session_state.messages[i]["rating"] = "up"
+                                    st.toast("Thanks for the feedback")
+                                except Exception as exc:
+                                    st.error(friendly_error(exc))
+                        with b2:
+                            if st.button("Not helpful", key=f"down_{i}"):
+                                try:
+                                    client_factory().rate_message(msg["id"], "down")
+                                    st.session_state.messages[i]["rating"] = "down"
+                                    st.toast("Thanks for the feedback")
+                                except Exception as exc:
+                                    st.error(friendly_error(exc))
+                        with b3:
+                            if msg.get("rating") not in (None, "none"):
+                                st.caption(f"Rated: {msg['rating']}")
 
-                        if msg.get("id"):
-                            st.caption("Was this answer helpful?")
-                            b1, b2, b3 = st.columns([1.2, 1.4, 2])
-                            with b1:
-                                if st.button("Helpful", key=f"up_{i}", use_container_width=True):
-                                    try:
-                                        client_factory().rate_message(msg["id"], "up")
-                                        st.session_state.messages[i]["rating"] = "up"
-                                        st.toast("Thanks for the feedback")
-                                    except Exception as exc:
-                                        st.error(friendly_error(exc))
-                            with b2:
-                                if st.button("Not helpful", key=f"down_{i}", use_container_width=True):
-                                    try:
-                                        client_factory().rate_message(msg["id"], "down")
-                                        st.session_state.messages[i]["rating"] = "down"
-                                        st.toast("Thanks for the feedback")
-                                    except Exception as exc:
-                                        st.error(friendly_error(exc))
-                            with b3:
-                                if msg.get("rating") not in (None, "none"):
-                                    st.caption(f"Rated: {msg['rating']}")
+                prior = _find_prior_user_prompt(st.session_state.messages, i)
+                st.markdown('<div class="msg-actions">', unsafe_allow_html=True)
+                c1, c2 = st.columns([1, 1])
+                with c1:
+                    st.download_button(
+                        "⎘ Copy",
+                        data=msg.get("content") or "",
+                        file_name="documind-answer.txt",
+                        mime="text/plain",
+                        key=f"copy_{i}",
+                    )
+                with c2:
+                    if prior and st.button("↻ Regenerate", key=f"regen_{i}"):
+                        st.session_state.messages = st.session_state.messages[
+                            : i - 1 if i > 0 else 0
+                        ]
+                        st.session_state.pending_prompt = prior
+                        st.session_state.pop("last_failed_prompt", None)
+                        st.rerun()
+                st.markdown("</div>", unsafe_allow_html=True)
 
         if st.session_state.session_id:
             try:
@@ -507,6 +538,7 @@ def render_chat(client_factory: Callable, *, llm_provider: str = "") -> None:
         _run_chat_turn(client_factory, pending)
         return
 
+    _render_scope_chip(docs)
     prompt = st.chat_input("Ask a question about your documents…")
     if prompt:
         _run_chat_turn(client_factory, prompt)

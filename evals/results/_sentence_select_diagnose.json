@@ -1,0 +1,236 @@
+{
+  "generated_at": "2026-11-14T06:54:38.266747+00:00",
+  "label": "DRAFT LABELS \u2014 NOT FOR REPORTING",
+  "n": 20,
+  "in_default": 9,
+  "in_chunks": 17,
+  "in_selected": 2,
+  "losses": {
+    "b_scoring": 14,
+    "a_splitting": 1
+  },
+  "rows": [
+    {
+      "id": "disamb_motilal_code",
+      "query": "In the Motilal Oswal Midcap Fund SID, what scheme code appears on the cover?",
+      "key_facts": [
+        "MOTO/O/E/MIF/14/01/0006"
+      ],
+      "in_default": true,
+      "in_chunks": true,
+      "in_selected": false,
+      "loss": "b_scoring"
+    },
+    {
+      "id": "disamb_nippon_code",
+      "query": "In the Nippon India Growth Mid Cap Fund SID, what Scheme Code is printed?",
+      "key_facts": [
+        "NIMF/O/E/MIF/95/08/0001"
+      ],
+      "in_default": true,
+      "in_chunks": true,
+      "in_selected": false,
+      "loss": "b_scoring"
+    },
+    {
+      "id": "disamb_ppfas_code",
+      "query": "In the Parag Parikh Flexi Cap Fund SID, what scheme code is stated?",
+      "key_facts": [
+        "PPFA/O/E/FCF/13/04/0001"
+      ],
+      "in_default": false,
+      "in_chunks": true,
+      "in_selected": false,
+      "loss": "b_scoring"
+    },
+    {
+      "id": "disamb_hdfc_bench",
+      "query": "What AMFI Tier I benchmark does the HDFC Mid Cap Fund SID show on the cover?",
+      "key_facts": [
+        "NIFTY MIDCAP 150"
+      ],
+      "in_default": true,
+      "in_chunks": true,
+      "in_selected": false,
+      "loss": "b_scoring"
+    },
+    {
+      "id": "disamb_kotak_bench",
+      "query": "What Tier 1 benchmark does the Kotak Midcap Fund SID list?",
+      "key_facts": [
+        "Nifty Midcap 150 TRI"
+      ],
+      "in_default": true,
+      "in_chunks": true,
+      "in_selected": true,
+      "loss": null
+    },
+    {
+      "id": "disamb_motilal_bench",
+      "query": "Which midcap total-return index is named as the Motilal Oswal Midcap Fund benchmark?",
+      "key_facts": [
+        "Nifty Midcap 150"
+      ],
+      "in_default": false,
+      "in_chunks": true,
+      "in_selected": false,
+      "loss": "b_scoring"
+    },
+    {
+      "id": "disamb_ppfas_bench",
+      "query": "What AMFI Tier I benchmark riskometer pair does the Parag Parikh Flexi Cap Fund SID cite?",
+      "key_facts": [
+        "Nifty 500 TRI"
+      ],
+      "in_default": true,
+      "in_chunks": true,
+      "in_selected": false,
+      "loss": "b_scoring"
+    },
+    {
+      "id": "disamb_hdfc_former",
+      "query": "What former name does the HDFC Mid Cap Fund SID give for the scheme?",
+      "key_facts": [
+        "HDFC Mid-Cap Opportunities Fund"
+      ],
+      "in_default": true,
+      "in_chunks": true,
+      "in_selected": false,
+      "loss": "b_scoring"
+    },
+    {
+      "id": "disamb_hdfc_exit",
+      "query": "What exit-load percentage does the HDFC Mid Cap Fund SID charge within 1 year?",
+      "key_facts": [
+        "1.00%"
+      ],
+      "in_default": false,
+      "in_chunks": false,
+      "in_selected": false,
+      "loss": null
+    },
+    {
+      "id": "disamb_nippon_exit",
+      "query": "What exit load does the Nippon India Growth Mid Cap Fund SID apply within 1 month?",
+      "key_facts": [
+        "1%",
+        "1 month"
+      ],
+      "in_default": true,
+      "in_chunks": true,
+      "in_selected": false,
+      "loss": "b_scoring"
+    },
+    {
+      "id": "disamb_ppfas_horizon",
+      "query": "What minimum investment horizon does the Parag Parikh Flexi Cap Fund SID note for investors?",
+      "key_facts": [
+        "5 years"
+      ],
+      "in_default": false,
+      "in_chunks": true,
+      "in_selected": false,
+      "loss": "b_scoring"
+    },
+    {
+      "id": "disamb_hdfc_obj",
+      "query": "What investment objective sentence does the HDFC Mid Cap Fund SID state?",
+      "key_facts": [
+        "Mid-Cap"
+      ],
+      "in_default": true,
+      "in_chunks": true,
+      "in_selected": false,
+      "loss": "b_scoring"
+    },
+    {
+      "id": "disamb_motilal_obj",
+      "query": "What investment objective does the Motilal Oswal Midcap Fund SID state?",
+      "key_facts": [
+        "mid -cap companies"
+      ],
+      "in_default": false,
+      "in_chunks": true,
+      "in_selected": false,
+      "loss": "b_scoring"
+    },
+    {
+      "id": "disamb_nippon_obj",
+      "query": "What primary investment objective does the Nippon India Growth Mid Cap Fund SID state?",
+      "key_facts": [
+        "long term growth of capital"
+      ],
+      "in_default": false,
+      "in_chunks": true,
+      "in_selected": false,
+      "loss": "b_scoring"
+    },
+    {
+      "id": "disamb_ppfas_obj",
+      "query": "What investment objective opening does the Parag Parikh Flexi Cap Fund SID use?",
+      "key_facts": [
+        "long -\nterm capital growth"
+      ],
+      "in_default": false,
+      "in_chunks": true,
+      "in_selected": false,
+      "loss": "a_splitting"
+    },
+    {
+      "id": "disamb_kotak_obj",
+      "query": "What investment objective does the Kotak Midcap Fund SID state for mid companies?",
+      "key_facts": [
+        "mid companies"
+      ],
+      "in_default": false,
+      "in_chunks": true,
+      "in_selected": false,
+      "loss": "b_scoring"
+    },
+    {
+      "id": "disamb_hdfc_type",
+      "query": "How does the HDFC Mid Cap Fund SID describe the scheme type on the cover?",
+      "key_facts": [
+        "mid cap stocks"
+      ],
+      "in_default": false,
+      "in_chunks": true,
+      "in_selected": false,
+      "loss": "b_scoring"
+    },
+    {
+      "id": "disamb_motilal_name",
+      "query": "What scheme title heads the Motilal Oswal Midcap Fund SID?",
+      "key_facts": [
+        "MOTILAL OSWAL MIDCAP FUND"
+      ],
+      "in_default": true,
+      "in_chunks": true,
+      "in_selected": true,
+      "loss": null
+    },
+    {
+      "id": "exact_master_id",
+      "query": "What circular ID and date open the SEBI Master Circular for Mutual Funds PDF?",
+      "key_facts": [
+        "SEBI/HO/IMD/IMD-PoD-1/P/CIR/2024/90",
+        "June 27, 2024"
+      ],
+      "in_default": false,
+      "in_chunks": false,
+      "in_selected": false,
+      "loss": null
+    },
+    {
+      "id": "factual_master_supersede",
+      "query": "Which prior master circular does the June 2024 SEBI Mutual Funds Master Circular supersede?",
+      "key_facts": [
+        "May 19, 2023"
+      ],
+      "in_default": false,
+      "in_chunks": false,
+      "in_selected": false,
+      "loss": null
+    }
+  ]
+}

@@ -81,8 +81,44 @@ INGEST_ABLATIONS = {
 
 # Answer-path ablations (extractive). sentence_select does not rebuild the index.
 ANSWER_ABLATIONS = {
-    "extractive_default": {"answer_sentence_select": False},
-    "extractive_sentence_select": {"answer_sentence_select": True},
+    "default": {"answer_sentence_select": False},
+    "sentence_term_60": {
+        "answer_sentence_select": True,
+        "mode": "term",
+        "max_words": 60,
+        "use_embeddings": False,
+    },
+    "sentence_term_100": {
+        "answer_sentence_select": True,
+        "mode": "term",
+        "max_words": 100,
+        "use_embeddings": False,
+    },
+    "sentence_crossencoder_60": {
+        "answer_sentence_select": True,
+        "mode": "crossencoder",
+        "max_words": 60,
+    },
+    "sentence_crossencoder_100": {
+        "answer_sentence_select": True,
+        "mode": "crossencoder",
+        "max_words": 100,
+    },
+    "sentence_crossencoder_context_60": {
+        "answer_sentence_select": True,
+        "mode": "crossencoder_context",
+        "max_words": 60,
+    },
+    "sentence_crossencoder_context_100": {
+        "answer_sentence_select": True,
+        "mode": "crossencoder_context",
+        "max_words": 100,
+    },
+    "clean_chunk": {
+        "answer_sentence_select": True,
+        "mode": "clean_chunk",
+        "max_words": 100,
+    },
 }
 
 
@@ -203,7 +239,13 @@ def run_ablations(
     return report
 
 
-def _run_answer_ablations(questions, index, *, top_k: int = 4) -> dict[str, dict[str, float | None]]:
+def _run_answer_ablations(
+    questions,
+    index,
+    *,
+    top_k: int = 4,
+    n_sample: int = 20,
+) -> dict[str, dict[str, float | None]]:
     """Draft-label smoke: key-fact coverage + avg answer length for extractive modes."""
     import os
 
@@ -214,22 +256,27 @@ def _run_answer_ablations(questions, index, *, top_k: int = 4) -> dict[str, dict
     from langchain_core.messages import HumanMessage
 
     out: dict[str, dict[str, float | None]] = {}
-    sample = [q for q in questions if q.key_facts][:25] or questions[:25]
+    sample = [q for q in questions if q.key_facts][:n_sample] or questions[:n_sample]
     for name, spec in ANSWER_ABLATIONS.items():
         use_ss = bool(spec.get("answer_sentence_select"))
+        mode = str(spec.get("mode") or "term")
+        max_words = int(spec.get("max_words") or 60)
+        use_emb = bool(spec.get("use_embeddings", False))
         coverages: list[float] = []
         lengths: list[int] = []
         for q in sample:
             ranked = search_eval_index(index, q.query, top_k=top_k)
             docs = [(d, float(s)) for d, s in ranked.results]
             if use_ss:
-                # Term-overlap scoring only for ablation speed (still draft)
                 selected = select_answer_sentences(
-                    q.query, docs, use_embeddings=False
+                    q.query,
+                    docs,
+                    use_embeddings=use_emb,
+                    mode=mode,  # type: ignore[arg-type]
+                    max_words=max_words,
                 )
                 answer = selected.answer
             else:
-                # Classic extractive via prompt-shaped message
                 blocks = []
                 for i, (d, sc) in enumerate(docs, start=1):
                     blocks.append(

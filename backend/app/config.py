@@ -104,9 +104,15 @@ class Settings(BaseSettings):
 
     # Sentence-level extractive answers — OFF by default (snapshot uses classic extractive)
     answer_sentence_select: bool = False
+    # term | crossencoder | crossencoder_context | clean_chunk
+    answer_sentence_select_mode: str = "term"
+    answer_sentence_max_words: int = 60
 
     # Stronger hyphenation fix at ingest — OFF by default (changes chunk text / index hash)
     ingest_fix_hyphenation: bool = False
+
+    # Developer mode: show ranking scores / percentages in the UI
+    ui_developer_mode: bool = False
 
     # Prompt-injection guard — on for LLM providers only; extractive unaffected
     llm_injection_guard: bool = True

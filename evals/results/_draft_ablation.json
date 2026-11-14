@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-13T07:15:59.042060+00:00",
+  "generated_at": "2026-11-14T07:02:30.688017+00:00",
   "label": "DRAFT LABELS \u2014 NOT FOR REPORTING",
   "split": "test",
   "n_answerable": 51,
@@ -34,5 +34,61 @@
       "Recall@4": 0.7647058823529411,
       "MRR": 0.6535947712418301
     }
-  }
+  },
+  "answer_ablations": {
+    "default": {
+      "n": 20,
+      "key_fact_coverage": 0.425,
+      "avg_answer_words": 124.8,
+      "label": "DRAFT LABELS \u2014 NOT FOR REPORTING"
+    },
+    "sentence_term_60": {
+      "n": 20,
+      "key_fact_coverage": 0.1,
+      "avg_answer_words": 29.95,
+      "label": "DRAFT LABELS \u2014 NOT FOR REPORTING"
+    },
+    "sentence_term_100": {
+      "n": 20,
+      "key_fact_coverage": 0.1,
+      "avg_answer_words": 29.95,
+      "label": "DRAFT LABELS \u2014 NOT FOR REPORTING"
+    },
+    "sentence_crossencoder_60": {
+      "n": 20,
+      "key_fact_coverage": 0.15,
+      "avg_answer_words": 26.9,
+      "label": "DRAFT LABELS \u2014 NOT FOR REPORTING"
+    },
+    "sentence_crossencoder_100": {
+      "n": 20,
+      "key_fact_coverage": 0.15,
+      "avg_answer_words": 26.9,
+      "label": "DRAFT LABELS \u2014 NOT FOR REPORTING"
+    },
+    "sentence_crossencoder_context_60": {
+      "n": 20,
+      "key_fact_coverage": 0.15,
+      "avg_answer_words": 39.95,
+      "label": "DRAFT LABELS \u2014 NOT FOR REPORTING"
+    },
+    "sentence_crossencoder_context_100": {
+      "n": 20,
+      "key_fact_coverage": 0.15,
+      "avg_answer_words": 47.0,
+      "label": "DRAFT LABELS \u2014 NOT FOR REPORTING"
+    },
+    "clean_chunk": {
+      "n": 20,
+      "key_fact_coverage": 0.65,
+      "avg_answer_words": 99.35,
+      "label": "DRAFT LABELS \u2014 NOT FOR REPORTING"
+    }
+  },
+  "ingest_ablations_registered": [
+    "hybrid_rrf_strip_headers",
+    "hybrid_rrf_flag_low_text",
+    "hybrid_rrf_fix_hyphenation"
+  ],
+  "ingest_ablations_note": "Registered but not executed. Enabling ingest flags changes chunking_config_hash and uses a separate evals/.index/ directory. Do not run against labels until a verified baseline exists."
 }
