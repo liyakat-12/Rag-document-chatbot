@@ -5,6 +5,12 @@ Format inspired by Keep a Changelog. Newest first.
 
 ## [Unreleased]
 
+### Added — Sentence-select extractive (flagged)
+- `answer_sentence_select` (default off): top 2–3 scored sentences, ≤~60 words,
+  contact-line filter, per-sentence citations + highlighted context source.
+- `ingest_fix_hyphenation` (default off): joins `hands -on` and line-break hyphens;
+  changes eval index hash when enabled. Both registered in ablation runner.
+
 ### Added — Unattended session 2 (`unattended-2`)
 - Labeling support: tune unanswerable draft additions
   (`evals/data/questions_tune_additions.jsonl`); `evals.label` scans all real PDFs
