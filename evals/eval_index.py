@@ -52,12 +52,14 @@ def chunking_config_hash(config: dict[str, Any]) -> str:
     # index directory (flags off) stays stable; enabled flags get a new dir.
     strip_h = bool(config.get("ingest_strip_repeated_headers_footers", False))
     flag_lt = bool(config.get("ingest_flag_low_text_pages", False))
-    if strip_h or flag_lt:
+    fix_hy = bool(config.get("ingest_fix_hyphenation", False))
+    if strip_h or flag_lt or fix_hy:
         payload["ingest_strip_repeated_headers_footers"] = strip_h
         payload["ingest_flag_low_text_pages"] = flag_lt
         payload["ingest_low_text_char_threshold"] = int(
             config.get("ingest_low_text_char_threshold", 100)
         )
+        payload["ingest_fix_hyphenation"] = fix_hy
     raw = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
 
@@ -99,9 +101,13 @@ def _build_chunks(
     # mutate only for this build via local splitter params inside split_documents
     # which reads get_settings(). Override by monkeypatching attributes for the call.)
     old_size, old_overlap = settings.chunk_size, settings.chunk_overlap
+    old_hy = bool(getattr(settings, "ingest_fix_hyphenation", False))
     try:
         settings.chunk_size = int(config.get("chunk_size", old_size))
         settings.chunk_overlap = int(config.get("chunk_overlap", old_overlap))
+        settings.ingest_fix_hyphenation = bool(
+            config.get("ingest_fix_hyphenation", False)
+        )
         all_chunks: list[LCDocument] = []
         strip_h = bool(config.get("ingest_strip_repeated_headers_footers", False))
         flag_lt = bool(config.get("ingest_flag_low_text_pages", False))
@@ -124,6 +130,7 @@ def _build_chunks(
     finally:
         settings.chunk_size = old_size
         settings.chunk_overlap = old_overlap
+        settings.ingest_fix_hyphenation = old_hy
 
 
 def _empty_faiss() -> FAISS:

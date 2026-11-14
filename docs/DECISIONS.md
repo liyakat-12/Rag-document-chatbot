@@ -48,6 +48,16 @@ offline CI).
 **Reason:** CI must run offline with no model download when the flag is off;
 when the flag is on in CI without the model, behaviour degrades safely.
 
+## 2026-11-14 — Sentence-select + hyphenation flags
+
+**Decision:** `answer_sentence_select` and `ingest_fix_hyphenation` default **off**.
+Sentence-select runs only for extractive mode and replaces classic
+`ExtractiveChatModel` output; sources become context-with-highlights plus
+per-sentence citations. Hyphenation fix is applied in `clean_text(..., fix_hyphens=True)`
+and folds into `chunking_config_hash` when enabled.
+
+**Reason:** Snapshot / default index text must stay unchanged with flags off.
+
 ## 2026-11-13 — Follow-up rewrite behind chat.rewrite_followups (Unattended-3)
 
 **Decision:** New rewrite lives in `backend/app/rag/followups.py` and runs only when

@@ -21,7 +21,7 @@ from evals.eval_index import (
     _sparse_search,
     build_or_load_eval_index,
 )
-from evals.metrics import mrr, recall_at_4
+from evals.metrics import key_fact_coverage, mrr, recall_at_4
 from evals.runner import load_config
 from evals.schema import load_questions
 from evals.span_map import GoldSpan, ranks_of_relevant
@@ -70,6 +70,19 @@ INGEST_ABLATIONS = {
         "ingest_flag_low_text_pages": True,
         "requires_index_rebuild": True,
     },
+    "hybrid_rrf_fix_hyphenation": {
+        "mode": "hybrid",
+        "bm25_tokenizer": "whitespace",
+        "rerank": False,
+        "ingest_fix_hyphenation": True,
+        "requires_index_rebuild": True,
+    },
+}
+
+# Answer-path ablations (extractive). sentence_select does not rebuild the index.
+ANSWER_ABLATIONS = {
+    "extractive_default": {"answer_sentence_select": False},
+    "extractive_sentence_select": {"answer_sentence_select": True},
 }
 
 
@@ -130,15 +143,18 @@ def run_ablations(
             "MRR": sum(mrrs) / len(mrrs) if mrrs else None,
         }
 
+    answer_table = _run_answer_ablations(questions, index, top_k=top_k)
+
     report = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "label": "DRAFT LABELS — NOT FOR REPORTING",
         "split": split,
         "n_answerable": len(questions),
         "ablations": table,
+        "answer_ablations": answer_table,
         "ingest_ablations_registered": list(INGEST_ABLATIONS.keys()),
         "ingest_ablations_note": (
-            "Registered but not executed. Enabling either ingest flag changes "
+            "Registered but not executed. Enabling ingest flags changes "
             "chunking_config_hash and uses a separate evals/.index/ directory. "
             "Do not run against labels until a verified baseline exists."
         ),
@@ -166,8 +182,83 @@ def run_ablations(
             f"{'—' if mr is None else f'{mr:.4f}'} |"
         )
     lines.append("")
+    lines.extend(
+        [
+            "## Answer ablations (DRAFT LABELS — NOT FOR REPORTING)",
+            "",
+            "| Config | n | key_fact_coverage | avg_answer_words |",
+            "|--------|---|-------------------|------------------|",
+        ]
+    )
+    for name, row in (answer_table or {}).items():
+        kfc = row.get("key_fact_coverage")
+        avg = row.get("avg_answer_words")
+        lines.append(
+            f"| {name} | {row.get('n')} | "
+            f"{'—' if kfc is None else f'{kfc:.4f}'} | "
+            f"{'—' if avg is None else f'{avg:.1f}'} |"
+        )
+    lines.append("")
     md_path.write_text("\n".join(lines), encoding="utf-8")
     return report
+
+
+def _run_answer_ablations(questions, index, *, top_k: int = 4) -> dict[str, dict[str, float | None]]:
+    """Draft-label smoke: key-fact coverage + avg answer length for extractive modes."""
+    import os
+
+    from backend.app.config import get_settings
+    from backend.app.rag.llm_factory import ExtractiveChatModel
+    from backend.app.rag.sentence_select import select_answer_sentences
+    from evals.eval_index import search_eval_index
+    from langchain_core.messages import HumanMessage
+
+    out: dict[str, dict[str, float | None]] = {}
+    sample = [q for q in questions if q.key_facts][:25] or questions[:25]
+    for name, spec in ANSWER_ABLATIONS.items():
+        use_ss = bool(spec.get("answer_sentence_select"))
+        coverages: list[float] = []
+        lengths: list[int] = []
+        for q in sample:
+            ranked = search_eval_index(index, q.query, top_k=top_k)
+            docs = [(d, float(s)) for d, s in ranked.results]
+            if use_ss:
+                # Term-overlap scoring only for ablation speed (still draft)
+                selected = select_answer_sentences(
+                    q.query, docs, use_embeddings=False
+                )
+                answer = selected.answer
+            else:
+                # Classic extractive via prompt-shaped message
+                blocks = []
+                for i, (d, sc) in enumerate(docs, start=1):
+                    blocks.append(
+                        f"[Source {i}]\nDocument: {d.metadata.get('filename')}\n"
+                        f"Page: {d.metadata.get('page_number')}\n"
+                        f"Content:\n{d.page_content}"
+                    )
+                human = HumanMessage(
+                    content=(
+                        "Document context:\n"
+                        + "\n\n---\n\n".join(blocks)
+                        + f"\n\nUser question: {q.query}\n\n"
+                        "Write a grounded answer based only on the document context above:"
+                    )
+                )
+                answer = ExtractiveChatModel._extract_answer([human])
+            lengths.append(len((answer or "").split()))
+            cov = key_fact_coverage(answer or "", q.key_facts)
+            if cov is not None:
+                coverages.append(cov)
+        out[name] = {
+            "n": len(sample),
+            "key_fact_coverage": (sum(coverages) / len(coverages)) if coverages else None,
+            "avg_answer_words": (sum(lengths) / len(lengths)) if lengths else None,
+            "label": "DRAFT LABELS — NOT FOR REPORTING",
+        }
+    os.environ["ANSWER_SENTENCE_SELECT"] = "false"
+    get_settings.cache_clear()
+    return out
 
 
 def main() -> int:

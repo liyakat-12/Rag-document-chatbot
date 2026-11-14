@@ -19,17 +19,28 @@ def render_sources(sources: list[dict[str, Any]] | None, *, msg_index: int = 0) 
         for i, s in enumerate(sources):
             fname = s.get("filename") or "document.pdf"
             page = s.get("page_number", "?")
+            loc_type = s.get("location_type") or "page"
+            location = s.get("location") or f"page {page}"
             score = float(s.get("score") or 0) * 100
             content = s.get("content") or ""
             excerpt = content[:420]
-            st.markdown(f"**{fname}** · page {page}")
+            if loc_type == "section":
+                st.markdown(f"**{fname}** · {location}")
+            else:
+                st.markdown(f"**{fname}** · page {page}")
             st.caption(
                 f"Fused retrieval rank strength {score:.0f}% "
                 "(ranking signal, not verified accuracy)"
             )
-            # Source preview
-            preview = excerpt + ("…" if len(content) > 420 else "")
-            st.write(preview)
+            # Source preview — sentence-select context uses >>>highlight<<< markers
+            if s.get("context_preview") or ">>>" in content:
+                st.caption("Context (selected sentences highlighted)")
+                st.code(content[:1200] + ("…" if len(content) > 1200 else ""), language=None)
+            elif s.get("selected_sentence"):
+                st.markdown(f"> {content}")
+            else:
+                preview = excerpt + ("…" if len(content) > 420 else "")
+                st.write(preview)
             doc_id = s.get("document_id") or ""
             if doc_id and st.button(
                 "Open in viewer",

@@ -143,12 +143,13 @@ def load_pdf(
         flag_low_text = bool(getattr(settings, "ingest_flag_low_text_pages", False))
     if low_text_threshold is None:
         low_text_threshold = int(getattr(settings, "ingest_low_text_char_threshold", 100))
+    fix_hyphens = bool(getattr(settings, "ingest_fix_hyphenation", False))
 
     loader = PyPDFLoader(str(file_path))
     pages = loader.load()
     cleaned: list[LCDocument] = []
     for page in pages:
-        page.page_content = clean_text(page.page_content)
+        page.page_content = clean_text(page.page_content, fix_hyphens=fix_hyphens)
         if page.page_content:
             cleaned.append(page)
 

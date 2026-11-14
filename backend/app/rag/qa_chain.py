@@ -135,6 +135,9 @@ def _to_citations(docs_with_scores: list[tuple[LCDocument, float]]) -> list[Sour
                 chunk_id=str(meta.get("chunk_id", "")),
                 content=doc.page_content,
                 score=round(float(score), 4),
+                location_type=str(meta.get("location_type") or "page"),
+                location=str(meta.get("location") or meta.get("page_number") or ""),
+                file_type=str(meta.get("file_type") or "pdf"),
             )
         )
     return citations
@@ -276,10 +279,27 @@ async def generate_answer(
     summary: str = "",
     history: str = "",
 ) -> tuple[str, int]:
-    """Generate a grounded answer. Returns (answer, tokens_used)."""
+    """Generate a grounded answer. Returns (answer, tokens_used).
+
+    When ``answer_sentence_select`` is on and provider is extractive, returns a
+    sentence-selected answer and stashes selection on ``generate_answer.last_selection``.
+    """
     settings = get_settings()
+    generate_answer.last_selection = None  # type: ignore[attr-defined]
     if not docs_with_scores:
         return NOT_FOUND_MESSAGE, 0
+
+    # Sentence-select path (flag default off — classic extractive unchanged)
+    if (
+        getattr(settings, "answer_sentence_select", False)
+        and settings.llm_provider == "extractive"
+    ):
+        from backend.app.rag.sentence_select import select_answer_sentences
+
+        selected = select_answer_sentences(question, docs_with_scores)
+        generate_answer.last_selection = selected  # type: ignore[attr-defined]
+        tokens = count_tokens(question) + count_tokens(selected.answer)
+        return selected.answer, tokens
 
     guard = _use_injection_guard(settings)
     context = _format_context(docs_with_scores, injection_guard=guard)
@@ -315,6 +335,9 @@ async def generate_answer(
     return answer, tokens
 
 
+generate_answer.last_selection = None  # type: ignore[attr-defined]
+
+
 async def stream_answer(
     question: str,
     docs_with_scores: list[tuple[LCDocument, float]],
@@ -325,6 +348,14 @@ async def stream_answer(
     settings = get_settings()
     if not docs_with_scores:
         yield NOT_FOUND_MESSAGE
+        return
+
+    if (
+        getattr(settings, "answer_sentence_select", False)
+        and settings.llm_provider == "extractive"
+    ):
+        answer, _ = await generate_answer(question, docs_with_scores, summary=summary, history=history)
+        yield answer
         return
 
     guard = _use_injection_guard(settings)
@@ -369,10 +400,43 @@ def build_qa_result(
 ) -> dict[str, Any]:
     """Package answer + sources + confidence for API responses."""
     citations = _to_citations(docs_with_scores)
+    sources = [c.model_dump() for c in citations]
+    selection = getattr(generate_answer, "last_selection", None)
+    if selection is not None and getattr(selection, "sentences", None):
+        from backend.app.rag.sentence_select import highlight_sentences_in_chunk
+
+        sent_texts = [s.text for s in selection.sentences]
+        # Per-sentence citations first
+        sentence_cites = selection.citation_dicts()
+        # Context preview: first retrieved chunk with highlights (not verbatim answer dump)
+        if docs_with_scores:
+            doc0, score0 = docs_with_scores[0]
+            meta = doc0.metadata or {}
+            ctx = {
+                "document_id": str(meta.get("document_id") or ""),
+                "filename": str(meta.get("filename") or "document.pdf"),
+                "page_number": int(meta.get("page_number") or 1),
+                "chunk_id": str(meta.get("chunk_id") or ""),
+                "content": highlight_sentences_in_chunk(doc0.page_content or "", sent_texts),
+                "score": round(float(score0), 4),
+                "location_type": str(meta.get("location_type") or "page"),
+                "location": str(meta.get("location") or meta.get("page_number") or ""),
+                "file_type": str(meta.get("file_type") or "pdf"),
+                "context_preview": True,
+                "highlighted_sentences": sent_texts,
+            }
+            sources = [ctx] + sentence_cites
+        else:
+            sources = sentence_cites
+        retrieval = dict(retrieval or {})
+        retrieval["sentence_select"] = {
+            "n_sentences": len(selection.sentences),
+            "word_count": selection.word_count,
+        }
     confidence = compute_confidence(docs_with_scores, answer)
     return {
         "answer": answer,
-        "sources": [c.model_dump() for c in citations],
+        "sources": sources,
         "retrieved_chunks": [c.model_dump() for c in citations],
         "confidence": confidence,
         "tokens_used": tokens_used,

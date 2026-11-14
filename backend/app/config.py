@@ -57,7 +57,7 @@ class Settings(BaseSettings):
     upload_dir: str = "uploads"
     vector_store_dir: str = "vector_store"
     max_upload_size_mb: int = 40
-    allowed_extensions: str = ".pdf"
+    allowed_extensions: str = ".pdf,.docx"
 
     # RAG
     chunk_size: int = 1000
@@ -101,6 +101,12 @@ class Settings(BaseSettings):
 
     # Conversational follow-ups — OFF by default (keeps snapshot / expand_followup_query path)
     chat_rewrite_followups: bool = False
+
+    # Sentence-level extractive answers — OFF by default (snapshot uses classic extractive)
+    answer_sentence_select: bool = False
+
+    # Stronger hyphenation fix at ingest — OFF by default (changes chunk text / index hash)
+    ingest_fix_hyphenation: bool = False
 
     # Prompt-injection guard — on for LLM providers only; extractive unaffected
     llm_injection_guard: bool = True
