@@ -4,7 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parents[2]
@@ -32,9 +32,9 @@ class Settings(BaseSettings):
     api_prefix: str = "/api/v1"
     cors_origins: str = "http://localhost:5173,http://localhost:3000,http://localhost:8501"
 
-    # LLM Provider
-    llm_provider: Literal["openai", "azure_openai", "anthropic", "extractive"] = "openai"
-    # Embeddings: openai uses paid API; local uses free FastEmbed (no quota)
+    # LLM Provider — extractive default so the app runs offline with no .env
+    llm_provider: Literal["openai", "azure_openai", "anthropic", "extractive"] = "extractive"
+    # Embeddings: local FastEmbed by default (no API key); openai only when configured
     embedding_provider: Literal["openai", "local"] = "local"
     local_embedding_model: str = "BAAI/bge-small-en-v1.5"
     openai_api_key: str = ""
@@ -125,6 +125,54 @@ class Settings(BaseSettings):
     def strip_origins(cls, value: str) -> str:
         return value.strip() if isinstance(value, str) else value
 
+    @model_validator(mode="after")
+    def validate_provider_keys(self) -> "Settings":
+        """Friendly errors for invalid cloud settings — never require keys for extractive/local."""
+        provider = (self.llm_provider or "").strip().lower()
+        emb = (self.embedding_provider or "").strip().lower()
+        placeholder = {
+            "",
+            "sk-your-openai-api-key-here",
+            "change-me",
+            "your-api-key",
+        }
+
+        def _missing(key: str) -> bool:
+            return (key or "").strip() in placeholder or (key or "").strip().startswith("sk-your-")
+
+        if provider == "openai" and _missing(self.openai_api_key):
+            raise ValueError(
+                "LLM_PROVIDER=openai needs a real OPENAI_API_KEY in .env "
+                "(or set LLM_PROVIDER=extractive for offline answers)."
+            )
+        if provider == "azure_openai":
+            if _missing(self.azure_openai_api_key) or not (self.azure_openai_endpoint or "").strip():
+                raise ValueError(
+                    "LLM_PROVIDER=azure_openai needs AZURE_OPENAI_API_KEY and "
+                    "AZURE_OPENAI_ENDPOINT (or use LLM_PROVIDER=extractive)."
+                )
+            if not (self.azure_openai_chat_deployment or "").strip():
+                raise ValueError(
+                    "LLM_PROVIDER=azure_openai needs AZURE_OPENAI_CHAT_DEPLOYMENT."
+                )
+        if provider == "anthropic" and _missing(self.anthropic_api_key):
+            raise ValueError(
+                "LLM_PROVIDER=anthropic needs ANTHROPIC_API_KEY "
+                "(or set LLM_PROVIDER=extractive)."
+            )
+        if emb == "openai" and _missing(self.openai_api_key):
+            raise ValueError(
+                "EMBEDDING_PROVIDER=openai needs OPENAI_API_KEY "
+                "(or set EMBEDDING_PROVIDER=local)."
+            )
+        if self.retriever_top_k < 1 or self.retriever_top_k > 50:
+            raise ValueError("RETRIEVER_TOP_K must be between 1 and 50.")
+        if not (0.0 <= float(self.hybrid_search_weight) <= 1.0):
+            raise ValueError("HYBRID_SEARCH_WEIGHT must be between 0 and 1.")
+        if self.chunk_size < 100:
+            raise ValueError("CHUNK_SIZE must be at least 100.")
+        return self
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
@@ -162,8 +210,23 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    """Return cached application settings."""
-    settings = Settings()
+    """Return cached application settings (validated; friendly errors on misconfig)."""
+    try:
+        settings = Settings()
+    except Exception as exc:
+        # Collapse pydantic ValidationError into a single operator-facing message
+        msg = str(exc)
+        if hasattr(exc, "errors"):
+            try:
+                parts = []
+                for err in exc.errors():  # type: ignore[attr-defined]
+                    loc = ".".join(str(x) for x in err.get("loc") or ())
+                    parts.append(f"{loc}: {err.get('msg')}" if loc else str(err.get("msg")))
+                if parts:
+                    msg = "; ".join(parts)
+            except Exception:
+                pass
+        raise RuntimeError(f"Invalid configuration: {msg}") from None
     settings.upload_path
     settings.vector_store_path
     settings.data_path

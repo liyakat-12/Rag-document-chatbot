@@ -34,16 +34,20 @@ def _render_status_dot() -> None:
     provider = st.session_state.get("llm_provider") or "—"
     if status == "checking":
         css, label, tip = "is-checking", "Checking", "Probing the API…"
+    elif status == "starting":
+        css, label, tip = (
+            "is-checking",
+            "Starting",
+            "API is warming up local models and indexes.",
+        )
     elif status == "connected":
         offline = provider == "extractive"
-        css = "is-offline" if offline else "is-offline"
+        css = "is-offline"
         label = "Offline" if offline else "Online"
         tip = (
-            f"Backend connected · provider={provider}. "
-            "Details in Settings."
+            f"Backend connected · provider={provider}. Details in Settings."
             if not offline
-            else "Offline extractive mode — answers from retrieved passages only. "
-            "Change LLM_PROVIDER in Settings / .env."
+            else "Offline mode — answers from your documents only."
         )
     else:
         css, label, tip = (

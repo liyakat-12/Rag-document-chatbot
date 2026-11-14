@@ -169,6 +169,7 @@ class HealthResponse(BaseModel):
     embedding_provider: str = ""
     retrieval_strategy: str = "hybrid_rrf"
     ready: bool = True
+    detail: str = ""
 
 
 class SystemInfo(BaseModel):

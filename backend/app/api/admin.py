@@ -17,27 +17,39 @@ router = APIRouter(tags=["admin"])
 
 @router.get("/health", response_model=HealthResponse)
 async def health() -> HealthResponse:
+    from backend.app.runtime_state import RUNTIME
+
     settings = get_settings()
+    status = RUNTIME.status
+    # Map runtime → health status field
+    if status == "ready":
+        health_status = "ok"
+    elif status == "starting":
+        health_status = "starting"
+    else:
+        health_status = "degraded"
     return HealthResponse(
-        status="ok",
+        status=health_status,
         app=settings.app_name,
         version=APP_VERSION,
         llm_provider=settings.llm_provider,
         embedding_provider=settings.embedding_provider,
         retrieval_strategy="hybrid_rrf",
-        ready=True,
+        ready=bool(RUNTIME.ready),
+        detail=RUNTIME.detail or "",
     )
 
 
 @router.get("/ready")
 async def ready() -> dict:
-    """Readiness: DB + vector store reachable (does not warm embeddings)."""
+    """Readiness: warmup complete + DB + vector store reachable."""
     from sqlalchemy import text
 
     from backend.app.db.session import AsyncSessionLocal
     from backend.app.rag.vector_store import get_vector_store
+    from backend.app.runtime_state import RUNTIME
 
-    checks: dict[str, str] = {}
+    checks: dict[str, str] = {"runtime": RUNTIME.status}
     try:
         async with AsyncSessionLocal() as db:
             await db.execute(text("SELECT 1"))
@@ -50,8 +62,10 @@ async def ready() -> dict:
         checks["vector_store"] = f"ok ({n} chunks)"
     except Exception as exc:
         checks["vector_store"] = f"error: {exc}"
-    ok = all(v.startswith("ok") for v in checks.values())
-    return {"ready": ok, "checks": checks}
+    ok = bool(RUNTIME.ready) and all(
+        v.startswith("ok") or v == "ready" for k, v in checks.items() if k != "runtime"
+    ) and RUNTIME.status == "ready"
+    return {"ready": ok, "status": RUNTIME.status, "detail": RUNTIME.detail, "checks": checks}
 
 
 @router.get("/admin/stats", response_model=AdminStats)

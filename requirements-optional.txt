@@ -1,0 +1,6 @@
+# Optional heavy dependencies (not required for offline extractive demo)
+# OCR / layout (install only if needed)
+# unstructured>=0.16.0
+# pytesseract>=0.3.10
+# NLI / cross-encoder already pulled transitively via sentence-transformers when reranker is used
+sentence-transformers>=3.0.0

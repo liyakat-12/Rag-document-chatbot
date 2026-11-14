@@ -135,17 +135,29 @@ def _refresh_provider(*, force: bool = False) -> None:
     try:
         health = client().health()
         st.session_state.llm_provider = health.get("llm_provider") or ""
-        st.session_state.backend_ok = True
-        st.session_state.backend_status = "connected"
         st.session_state.backend_app = health.get("app") or "DocuMind AI"
         st.session_state.backend_error = None
+        st.session_state.backend_detail = health.get("detail") or ""
+        status = (health.get("status") or "").lower()
+        ready = bool(health.get("ready"))
+        if status == "starting" or (not ready and status not in {"ok", "degraded"}):
+            st.session_state.backend_ok = False
+            st.session_state.backend_status = "starting"
+        elif status in {"ok", "ready"} or ready:
+            st.session_state.backend_ok = True
+            st.session_state.backend_status = "connected"
+        elif status == "degraded":
+            st.session_state.backend_ok = True  # API up; answers may be slow
+            st.session_state.backend_status = "connected"
+        else:
+            st.session_state.backend_ok = ready
+            st.session_state.backend_status = "connected" if ready else "starting"
         st.session_state._health_checked_at = now
     except Exception as exc:
         st.session_state.backend_ok = False
         st.session_state.backend_status = "unavailable"
         st.session_state.backend_error = str(exc)[:160]
         st.session_state._health_checked_at = now
-        # Drop stale doc cache so empty/unavailable states stay honest
         st.session_state.pop("_indexed_docs_cache", None)
         st.session_state.pop("_indexed_docs_cache_at", None)
 
@@ -157,6 +169,30 @@ def main() -> None:
     _refresh_provider(force=force_health)
 
     render_sidebar(client, on_new_chat=new_chat, on_load_session=load_session)
+
+    if st.session_state.get("backend_status") == "starting":
+        st.markdown(
+            """
+            <div class="hero-wrap">
+              <p class="brand-hero">DocuMind AI</p>
+              <p class="hero-title">Starting up</p>
+              <p class="hero-sub">
+                Loading the local search index. This usually takes a few seconds
+                on first launch — hang tight.
+              </p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        detail = st.session_state.get("backend_detail") or ""
+        if detail:
+            st.caption(detail)
+        st.info("The API is warming up. The page will unlock automatically.")
+        import time as _time
+
+        _time.sleep(1.5)
+        st.rerun()
+        return
 
     page = st.session_state.get("page", "Chat")
     if page == "Documents":
