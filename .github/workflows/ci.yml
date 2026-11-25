@@ -19,8 +19,6 @@ jobs:
     env:
       LLM_PROVIDER: extractive
       EMBEDDING_PROVIDER: local
-      QUERY_REWRITING_ENABLED: "false"
-      RERANKER_ENABLED: "false"
       SEMANTIC_CACHE_ENABLED: "false"
       DATABASE_URL: sqlite+aiosqlite:///./ci-test.db
       OPENAI_API_KEY: test-key
