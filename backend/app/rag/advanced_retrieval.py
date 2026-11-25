@@ -11,6 +11,7 @@ the model cannot be loaded or scored.
 from __future__ import annotations
 
 import asyncio
+import math
 import re
 import time
 import threading
@@ -225,15 +226,15 @@ async def retrieve_advanced(
         rerank_documents, question, candidates, get_settings().retriever_top_k
     )
 
-    # Scores are display heuristics, not calibrated relevance probabilities.
-    # Keep the range comparable across reranker and safe RRF-fallback modes.
+    # Cross-encoder scores are logits. Apply a stable sigmoid for display and
+    # the existing confidence heuristic; min-max scaling would force every
+    # query's top result to 1.0 and falsely inflate confidence.
     if reranked and rerank_details.get("method") == "cross_encoder":
-        values = [score for _, score in reranked]
-        low, high = min(values), max(values)
-        if high > low:
-            reranked = [(doc, (score - low) / (high - low)) for doc, score in reranked]
-        else:
-            reranked = [(doc, 1.0) for doc, _ in reranked]
+        def _sigmoid(score: float) -> float:
+            clipped = max(-60.0, min(60.0, float(score)))
+            return 1.0 / (1.0 + math.exp(-clipped))
+
+        reranked = [(doc, _sigmoid(score)) for doc, score in reranked]
     elif reranked:
         max_score = max((score for _, score in reranked), default=0.0) or 1.0
         reranked = [(doc, score / max_score) for doc, score in reranked]
