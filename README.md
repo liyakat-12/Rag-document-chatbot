@@ -136,7 +136,7 @@ py -3.12 -m venv .venv
 pip install -r requirements.txt
 ```
 
-Default `.env` uses **extractive** LLM + **local** embeddings (no paid API required).
+To run fully offline without a paid chat API, set `LLM_PROVIDER=extractive` and keep `EMBEDDING_PROVIDER=local`. Query rewriting then uses a keyword-focused fallback; the cross-encoder reranker runs locally.
 
 ---
 
@@ -293,8 +293,8 @@ pytest -q
 
 - Auth / multi-tenant workspaces  
 - Persistent BM25 + async ingest progress SSE  
-- Persistent BM25 + async ingest progress SSE  
-- Richer evaluation (RAGAS / human labels)  
+- Retrieval benchmarks with a larger human-labeled relevance dataset  
+- Groundedness and citation validation (RAGAS / human review)  
 
 ---
 
