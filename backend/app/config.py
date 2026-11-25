@@ -85,6 +85,10 @@ class Settings(BaseSettings):
 
     # Retrieval extras (Phase 3) — OFF / current behaviour by default
     retrieval_bm25_tokenizer: Literal["whitespace", "normalized"] = "whitespace"
+    # Multi-query expansion is opt-in to preserve the release-1 baseline.
+    retrieval_multi_query_enabled: bool = False
+    retrieval_multi_query_max_variants: int = 3
+    retrieval_multi_query_candidate_multiplier: int = 4
     retrieval_reranker_enabled: bool = False
     retrieval_reranker_top_n: int = 16
     retrieval_reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
