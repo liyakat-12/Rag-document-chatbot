@@ -45,7 +45,37 @@ def render_retrieval_details(
     if not retrieval and not timings:
         return
     with st.expander("Advanced Retrieval Details", expanded=False):
-        st.caption("Hybrid search diagnostics (FAISS + BM25 → RRF).")
+        st.caption(
+            "Query rewriting (optional) → hybrid retrieval (FAISS + BM25 → RRF) "
+            "→ cross-encoder reranking (optional)."
+        )
+        rewrite = retrieval.get("query_rewriting") or {}
+        reranker = retrieval.get("reranking") or {}
+        if rewrite or retrieval.get("candidate_count") is not None or reranker:
+            st.markdown("**Query rewriting and reranking**")
+            if rewrite:
+                st.caption(
+                    f"Rewrite: {rewrite.get('method', 'unknown')} · "
+                    f"{rewrite.get('variants', len(retrieval.get('query_variants') or []))} "
+                    "query variant(s)"
+                )
+                for index, query in enumerate(retrieval.get("query_variants") or [], start=1):
+                    st.write(f"{index}. {query}")
+            if retrieval.get("candidate_count") is not None:
+                st.caption(
+                    f"Candidate pool: {retrieval.get('candidate_count')} chunks "
+                    f"before final top-{retrieval.get('top_k', 'K')} selection"
+                )
+            if reranker:
+                if reranker.get("method") == "rrf_fallback":
+                    st.caption("Cross-encoder unavailable; using fused RRF ranking.")
+                elif reranker.get("method") == "cross_encoder":
+                    st.caption(
+                        f"Cross-encoder: {reranker.get('model', 'enabled')} · "
+                        f"{reranker.get('latency_ms', '—')} ms"
+                    )
+                else:
+                    st.caption("Cross-encoder disabled")
         cols = st.columns(3)
         cols[0].metric("Strategy", str(retrieval.get("strategy") or "hybrid_rrf"))
         cols[1].metric("Top-K", retrieval.get("top_k", "—"))
