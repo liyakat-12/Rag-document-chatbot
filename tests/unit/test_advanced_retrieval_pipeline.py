@@ -42,6 +42,7 @@ async def test_advanced_retrieval_fuses_variants_then_reranks_once(monkeypatch):
         return HybridSearchResult(results=[(b, 0.9), (c, 0.8)], details={})
 
     import backend.app.rag.hybrid_search as hybrid
+    monkeypatch.setattr(hybrid, "ensure_bm25", lambda: None)
     monkeypatch.setattr(hybrid, "hybrid_search_detailed", fake_hybrid)
 
     rerank_calls = []
