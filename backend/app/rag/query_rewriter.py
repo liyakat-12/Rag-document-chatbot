@@ -27,7 +27,7 @@ _STOPWORDS = {
 
 def _clean_query(value: str) -> str:
     """Normalise whitespace and keep each search string bounded."""
-    return re.sub(r"\\s+", " ", (value or "")).strip()[:1000]
+    return re.sub(r"\s+", " ", (value or "")).strip()[:1000]
 
 
 def parse_query_variants(raw: str, original: str, max_variants: int = 3) -> list[str]:
@@ -38,7 +38,7 @@ def parse_query_variants(raw: str, original: str, max_variants: int = 3) -> list
         return variants[:max_variants]
 
     for line in (raw or "").splitlines():
-        candidate = re.sub(r"^\\s*(?:[-*•]|\\d+[.)])\\s*", "", line).strip()
+        candidate = re.sub(r"^\s*(?:[-*•]|\d+[.)])\s*", "", line).strip()
         candidate = _clean_query(candidate.strip('"').strip("'"))
         if candidate and candidate.casefold() not in {item.casefold() for item in variants}:
             variants.append(candidate)
@@ -49,7 +49,7 @@ def parse_query_variants(raw: str, original: str, max_variants: int = 3) -> list
 
 def keyword_query_variant(question: str) -> str:
     """Build a conservative offline search variant by removing common stopwords."""
-    terms = re.findall(r"[\\w./%-]+", _clean_query(question))
+    terms = re.findall(r"[\w./%-]+", _clean_query(question))
     useful = [term for term in terms if len(term) > 2 and term.casefold() not in _STOPWORDS]
     return " ".join(dict.fromkeys(useful))
 
@@ -65,7 +65,7 @@ def _response_text(response: Any) -> str:
                 pieces.append(str(block.get("text") or ""))
             else:
                 pieces.append(str(block))
-        return "\\n".join(pieces)
+        return "\n".join(pieces)
     return str(content or "")
 
 
@@ -96,9 +96,9 @@ async def generate_query_variants(
             "identifiers, quoted phrases, and constraints. Rephrase or make implicit "
             "concepts explicit; do not answer the question and do not invent details. "
             "Use recent conversation only to resolve references. Return one standalone "
-            "query per line with no explanation. The original query will also be searched.\\n\\n"
-            "Recent conversation:\\n" + (recent_history[-2500:] or "(none)") +
-            "\\n\\nOriginal question:\\n" + original
+            "query per line with no explanation. The original query will also be searched.\n\n"
+            "Recent conversation:\n" + (recent_history[-2500:] or "(none)") +
+            "\n\nOriginal question:\n" + original
         )
         response = await llm.ainvoke(prompt)
         variants = parse_query_variants(_response_text(response), original, limit)
