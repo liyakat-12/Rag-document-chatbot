@@ -191,6 +191,17 @@ async def retrieve_advanced(
         ensure_bm25,
     )
 
+    settings = get_settings()
+    if not settings.query_rewriting_enabled and not settings.reranker_enabled:
+        # Preserve exact release behaviour (ranking, scores, and diagnostics)
+        # when both advanced stages are explicitly disabled.
+        return await asyncio.to_thread(
+            hybrid_search_detailed,
+            question,
+            k=settings.retriever_top_k,
+            document_ids=document_ids,
+        )
+
     variants, rewrite_details = await rewrite_query(question, recent_history=recent_history)
     if not variants:
         variants = [_clean_query(question)]
