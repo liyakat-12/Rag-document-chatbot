@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import time
 from collections.abc import AsyncIterator
 from typing import Any, Optional
 
@@ -10,7 +12,14 @@ from langchain_core.prompts import ChatPromptTemplate
 
 from backend.app.config import get_settings
 from backend.app.models.schemas import SourceCitation
-from backend.app.rag.hybrid_search import HybridSearchResult, hybrid_search, hybrid_search_detailed
+from backend.app.rag.hybrid_search import (
+    HybridSearchResult,
+    hybrid_search,
+    hybrid_search_detailed,
+    reciprocal_rank_fusion,
+    _summary_hits,
+)
+from backend.app.rag.query_rewriter import generate_query_variants
 from backend.app.rag.llm_factory import EXTRACTIVE_FALLBACK_PREFIX, ExtractiveChatModel, get_chat_llm
 from backend.app.utils.logging import get_logger
 from backend.app.utils.tokens import count_tokens, truncate_to_token_budget
@@ -203,17 +212,139 @@ def expand_followup_query(question: str, recent_user_questions: list[str]) -> st
 async def retrieve(
     question: str,
     document_ids: Optional[list[str]] = None,
+    recent_history: str = "",
 ) -> list[tuple[LCDocument, float]]:
-    """Run hybrid retrieval for a question."""
+    """Run baseline hybrid retrieval or opt-in multi-query retrieval."""
+    if get_settings().retrieval_multi_query_enabled:
+        detailed = await retrieve_detailed(
+            question, document_ids=document_ids, recent_history=recent_history
+        )
+        return detailed.results
     return hybrid_search(question, document_ids=document_ids)
 
 
 async def retrieve_detailed(
     question: str,
     document_ids: Optional[list[str]] = None,
+    recent_history: str = "",
 ) -> HybridSearchResult:
-    """Run hybrid retrieval and return diagnostics for the UI/API."""
-    return hybrid_search_detailed(question, document_ids=document_ids)
+    """Retrieve with the unchanged baseline or opt-in rewrite/fuse/rerank stages."""
+    settings = get_settings()
+    if not settings.retrieval_multi_query_enabled:
+        # Preserve release-1 behaviour exactly unless the feature flag is enabled.
+        return hybrid_search_detailed(question, document_ids=document_ids)
+
+    started = time.perf_counter()
+    variants, rewrite_info = await generate_query_variants(
+        question,
+        recent_history=recent_history,
+        max_variants=settings.retrieval_multi_query_max_variants,
+    )
+    if not variants:
+        variants = [question]
+
+    top_k = settings.retriever_top_k
+    multiplier = max(2, int(settings.retrieval_multi_query_candidate_multiplier))
+    candidate_k = max(
+        top_k * multiplier,
+        int(settings.retrieval_reranker_top_n) if settings.retrieval_reranker_enabled else top_k,
+    )
+
+    # Each query retrieves a wider candidate pool without reranking individually.
+    # Reranking is applied once, after the multi-query RRF union is built.
+    per_query = await asyncio.gather(
+        *[
+            asyncio.to_thread(
+                hybrid_search_detailed,
+                variant,
+                candidate_k,
+                document_ids,
+                apply_reranker=False,
+                apply_dedupe=False,
+                record_metrics=False,
+            )
+            for variant in variants
+        ]
+    )
+
+    rankings = [item.results for item in per_query]
+    weights = [1.0] + [0.8] * max(0, len(rankings) - 1)
+    fused = reciprocal_rank_fusion(rankings, weights=weights)
+    candidate_count = len(fused)
+
+    reranker_info: dict[str, Any] = {"enabled": False}
+    reranker_ms = 0.0
+    selected = fused
+    if settings.retrieval_reranker_enabled and selected:
+        from backend.app.rag.reranker import rerank_candidates
+
+        rerank_limit = max(top_k, int(settings.retrieval_reranker_top_n))
+        rerank_started = time.perf_counter()
+        selected, reranker_info = await asyncio.to_thread(
+            rerank_candidates, question, selected[:rerank_limit]
+        )
+        reranker_ms = (time.perf_counter() - rerank_started) * 1000
+
+        # Cross-encoder outputs are relevance logits, not probabilities.
+        # Convert them to a stable display scale with the best item at 1.0.
+        if selected and not reranker_info.get("fallback"):
+            scores = [float(score) for _, score in selected]
+            low, high = min(scores), max(scores)
+            if high > low:
+                selected = [(doc, (float(score) - low) / (high - low)) for doc, score in selected]
+            else:
+                selected = [(doc, 1.0) for doc, _ in selected]
+
+    if settings.retrieval_dedupe_near_duplicates and selected:
+        from backend.app.rag.dedupe import dedupe_near_duplicates
+
+        selected = dedupe_near_duplicates(selected)
+
+    results = selected[:top_k]
+    if results and (not reranker_info.get("enabled") or reranker_info.get("fallback")):
+        maximum = max((float(score) for _, score in results), default=0.0)
+        if maximum > 0:
+            results = [(doc, float(score) / maximum) for doc, score in results]
+        else:
+            results = [(doc, 1.0) for doc, _ in results]
+
+    primary = per_query[0]
+    total_ms = (time.perf_counter() - started) * 1000
+    details: dict[str, Any] = {
+        "strategy": "multi_query_hybrid_rrf",
+        "query_rewriting": rewrite_info,
+        "query_variants": variants,
+        "candidate_k": candidate_k,
+        "candidate_count": candidate_count,
+        "reranker": {
+            **reranker_info,
+            "latency_ms": round(reranker_ms, 2),
+        },
+        "variant_retrieval": [
+            {
+                "query": variant,
+                "candidate_count": len(item.results),
+                "semantic_count": len(item.dense_results),
+                "bm25_count": len(item.sparse_results),
+                "latency_ms": item.details.get("latency_ms"),
+            }
+            for variant, item in zip(variants, per_query)
+        ],
+        "semantic": primary.details.get("semantic", {}),
+        "bm25": primary.details.get("bm25", {}),
+        "fused": {
+            "count": len(results),
+            "hits": _summary_hits(results),
+        },
+        "latency_ms": round(total_ms, 2),
+    }
+    return HybridSearchResult(
+        results=results,
+        details=details,
+        # Preserve original-query rank lists for the existing refusal diagnostics.
+        dense_results=primary.dense_results,
+        sparse_results=primary.sparse_results,
+    )
 
 
 def _build_messages(
