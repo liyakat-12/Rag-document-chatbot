@@ -151,7 +151,7 @@ class HealthResponse(BaseModel):
     version: str
     llm_provider: str
     embedding_provider: str = ""
-    retrieval_strategy: str = "hybrid_rrf"
+    retrieval_strategy: str = "advanced_hybrid_rrf_rerank"
 
 
 class SystemInfo(BaseModel):
@@ -165,6 +165,11 @@ class SystemInfo(BaseModel):
     retrieval_strategy: str
     retriever_top_k: int
     hybrid_search_weight: float
+    query_rewriting_enabled: bool = True
+    query_rewrite_max_variants: int = 3
+    reranker_enabled: bool = True
+    reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    reranker_candidate_multiplier: int = 4
     chunk_size: int
     chunk_overlap: int
     semantic_cache_enabled: bool
