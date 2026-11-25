@@ -145,6 +145,12 @@ def render_retrieval_details(
                     f"Candidate pool: {retrieval.get('candidate_count')} chunks "
                     f"before final top-{retrieval.get('top_k', 'K')} selection"
                 )
+            final_stage = retrieval.get("final") or {}
+            if final_stage:
+                st.caption(
+                    f"Final selected evidence: {final_stage.get('count', 0)} chunk(s) "
+                    "after optional reranking"
+                )
             if reranker.get("enabled"):
                 if reranker.get("fallback"):
                     st.caption(f"Cross-encoder: fallback to RRF ({reranker.get('fallback')})")
