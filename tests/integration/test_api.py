@@ -13,6 +13,9 @@ async def test_health(client: AsyncClient):
     data = res.json()
     assert data["status"] == "ok"
     assert "llm_provider" in data
+    assert data["retrieval_strategy"] == (
+        "multi_query+hybrid_rrf+cross_encoder_rerank"
+    )
 
 
 @pytest.mark.asyncio
@@ -57,7 +60,11 @@ async def test_system_info(client: AsyncClient):
     res = await client.get("/api/v1/admin/system")
     assert res.status_code == 200
     data = res.json()
-    assert data["retrieval_strategy"] == "hybrid_rrf"
+    assert data["retrieval_strategy"] == (
+        "multi_query+hybrid_rrf+cross_encoder_rerank"
+    )
+    assert data["query_rewriting_enabled"] is True
+    assert data["reranker_enabled"] is True
     assert "llm_provider" in data
     assert "openai_api_key" not in data
 

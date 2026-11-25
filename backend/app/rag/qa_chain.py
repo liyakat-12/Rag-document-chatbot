@@ -10,7 +10,8 @@ from langchain_core.prompts import ChatPromptTemplate
 
 from backend.app.config import get_settings
 from backend.app.models.schemas import SourceCitation
-from backend.app.rag.hybrid_search import HybridSearchResult, hybrid_search, hybrid_search_detailed
+from backend.app.rag.hybrid_search import HybridSearchResult
+from backend.app.rag.advanced_retrieval import retrieve_advanced
 from backend.app.rag.llm_factory import EXTRACTIVE_FALLBACK_PREFIX, ExtractiveChatModel, get_chat_llm
 from backend.app.utils.logging import get_logger
 from backend.app.utils.tokens import count_tokens, truncate_to_token_budget
@@ -122,17 +123,24 @@ def expand_followup_query(question: str, recent_user_questions: list[str]) -> st
 async def retrieve(
     question: str,
     document_ids: Optional[list[str]] = None,
+    recent_history: str = "",
 ) -> list[tuple[LCDocument, float]]:
-    """Run hybrid retrieval for a question."""
-    return hybrid_search(question, document_ids=document_ids)
+    """Run the advanced rewrite, hybrid retrieval, and reranking pipeline."""
+    result = await retrieve_advanced(
+        question, document_ids=document_ids, recent_history=recent_history
+    )
+    return result.results
 
 
 async def retrieve_detailed(
     question: str,
     document_ids: Optional[list[str]] = None,
+    recent_history: str = "",
 ) -> HybridSearchResult:
-    """Run hybrid retrieval and return diagnostics for the UI/API."""
-    return hybrid_search_detailed(question, document_ids=document_ids)
+    """Run advanced retrieval and return rewrite/reranking diagnostics."""
+    return await retrieve_advanced(
+        question, document_ids=document_ids, recent_history=recent_history
+    )
 
 
 def _build_messages(

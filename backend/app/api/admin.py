@@ -15,6 +15,16 @@ APP_VERSION = "1.1.0"
 router = APIRouter(tags=["admin"])
 
 
+def _retrieval_strategy(settings) -> str:
+    """Report the retrieval stages actually enabled in runtime configuration."""
+    stages = ["hybrid_rrf"]
+    if settings.query_rewriting_enabled:
+        stages.insert(0, "multi_query")
+    if settings.reranker_enabled:
+        stages.append("cross_encoder_rerank")
+    return "+".join(stages)
+
+
 @router.get("/health", response_model=HealthResponse)
 async def health() -> HealthResponse:
     settings = get_settings()
@@ -24,7 +34,7 @@ async def health() -> HealthResponse:
         version=APP_VERSION,
         llm_provider=settings.llm_provider,
         embedding_provider=settings.embedding_provider,
-        retrieval_strategy="hybrid_rrf",
+        retrieval_strategy=_retrieval_strategy(settings),
     )
 
 
@@ -56,9 +66,14 @@ async def system_info() -> SystemInfo:
         local_embedding_model=settings.local_embedding_model,
         openai_chat_model=settings.openai_chat_model,
         llm_temperature=settings.llm_temperature,
-        retrieval_strategy="hybrid_rrf",
+        retrieval_strategy=_retrieval_strategy(settings),
         retriever_top_k=settings.retriever_top_k,
         hybrid_search_weight=settings.hybrid_search_weight,
+        query_rewriting_enabled=settings.query_rewriting_enabled,
+        query_rewrite_max_variants=settings.query_rewrite_max_variants,
+        reranker_enabled=settings.reranker_enabled,
+        reranker_model=settings.reranker_model,
+        reranker_candidate_multiplier=settings.reranker_candidate_multiplier,
         chunk_size=settings.chunk_size,
         chunk_overlap=settings.chunk_overlap,
         semantic_cache_enabled=settings.semantic_cache_enabled,
