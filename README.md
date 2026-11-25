@@ -3,7 +3,7 @@
 **Ask your documents. Get grounded answers.**
 
 Enterprise-style **Retrieval-Augmented Generation (RAG)** assistant for private PDFs.
-Upload documents, ask questions, and receive answers with source citations, grounding confidence, and hybrid retrieval diagnostics.
+Upload documents, ask questions, and receive grounded answers with source citations, heuristic confidence, and retrieval diagnostics. The retrieval pipeline supports query rewriting, hybrid search, RRF fusion, and optional cross-encoder reranking.
 
 ---
 
@@ -13,14 +13,16 @@ Teams need trustworthy answers from their own PDFs — resumes, policies, manual
 
 ## Solution
 
-DocuMind AI indexes your PDFs locally, retrieves evidence with **FAISS + BM25 → RRF fusion**, then answers only from that context. If evidence is missing, it says so.
+DocuMind AI indexes your PDFs locally, rewrites the question into bounded search variants, retrieves evidence with **FAISS + BM25 → RRF fusion**, and reranks candidate chunks with a local cross-encoder before answering only from the selected context. The original question is always included in retrieval. If evidence is missing, it says so.
 
 ---
 
 ## Features
 
 - Multi-PDF upload (40 MB) with real ingestion stage timings
-- Hybrid retrieval (semantic + keyword) with expandable retrieval details
+- Advanced retrieval: bounded query rewriting + multi-query hybrid retrieval (FAISS + BM25 + RRF)
+- Local cross-encoder reranking to order candidate chunks by query relevance
+- Retrieval diagnostics for rewrite variants, candidates, reranker method, and latency
 - Grounded answers, citations, heuristic grounding confidence
 - Streaming chat, conversation history, follow-up query expansion
 - Semantic cache, thumbs feedback, PDF conversation export
@@ -55,11 +57,17 @@ DocuMind AI indexes your PDFs locally, retrieves evidence with **FAISS + BM25 �
                 │ FAISS + BM25 Index  │
                 └──────────┬──────────┘
                            │
-Question ───────────────→ Retrieval
+Question ───────────────→ Query Rewriting
                            ↓
-                    Hybrid Fusion (RRF)
+               Original + Rewritten Queries
                            ↓
-                    Context Builder
+                FAISS + BM25 Retrieval
+                           ↓
+                    RRF Fusion
+                           ↓
+              Cross-Encoder Reranking
+                           ↓
+                    Top-K Context
                            ↓
                          LLM / Extractive
                            ↓
@@ -70,7 +78,11 @@ Question ───────────────→ Retrieval
 
 1. **Semantic (FAISS)** — finds paraphrased / meaning-similar chunks  
 2. **Keyword (BM25)** — finds exact lexical matches  
-3. **RRF fusion** — combines rankings (`HYBRID_SEARCH_WEIGHT` = dense weight)
+3. **RRF fusion** — combines dense and sparse rankings (`HYBRID_SEARCH_WEIGHT` = dense weight)
+4. **Query rewriting** — creates up to three bounded search variants; the original query is always retained. If a generative LLM is unavailable, a keyword-focused fallback is used.
+5. **Cross-encoder reranking** — scores each retrieved query/chunk pair and selects the final top-K evidence chunks. If the optional model cannot load, the system safely falls back to the fused RRF ranking.
+
+The reranker model (`cross-encoder/ms-marco-MiniLM-L-6-v2`) is downloaded on first use. First-request latency can therefore be higher. Reranking improves evidence ordering; it cannot repair missing or incorrect source documents or guarantee answer correctness.
 
 ---
 
@@ -138,6 +150,11 @@ See `.env.example`. Important keys:
 | `EMBEDDING_PROVIDER` | `local` · `openai` |
 | `RETRIEVER_TOP_K` | Fused chunks returned |
 | `HYBRID_SEARCH_WEIGHT` | Dense weight in RRF |
+| `QUERY_REWRITING_ENABLED` | Enable bounded query rewrites (default: true) |
+| `QUERY_REWRITE_MAX_VARIANTS` | Maximum query variants including the original (default: 3) |
+| `RERANKER_ENABLED` | Enable local cross-encoder reranking (default: true) |
+| `RERANKER_MODEL` | SentenceTransformers cross-encoder model |
+| `RERANKER_CANDIDATE_MULTIPLIER` | Candidate pool size relative to final top-K |
 | `MAX_UPLOAD_SIZE_MB` | Default 40 |
 
 Never commit `.env` or API keys.
@@ -276,7 +293,7 @@ pytest -q
 
 - Auth / multi-tenant workspaces  
 - Persistent BM25 + async ingest progress SSE  
-- Stronger query rewriting for follow-ups  
+- Persistent BM25 + async ingest progress SSE  
 - Richer evaluation (RAGAS / human labels)  
 
 ---
