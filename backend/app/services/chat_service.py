@@ -312,7 +312,9 @@ async def chat_stream(
     retrieval_query = expand_followup_query(message, _prior_user_questions(messages))
 
     t_ret = time.perf_counter()
-    detailed = await retrieve_detailed(retrieval_query, document_ids=document_ids)
+    detailed = await retrieve_detailed(
+        retrieval_query, document_ids=document_ids, recent_history=history
+    )
     retrieval_ms = (time.perf_counter() - t_ret) * 1000
     docs = detailed.results
     retrieval_meta = {
