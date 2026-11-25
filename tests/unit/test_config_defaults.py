@@ -18,6 +18,9 @@ def test_defaults_are_offline_without_env(monkeypatch):
     s = Settings(_env_file=None)
     assert s.llm_provider == "extractive"
     assert s.embedding_provider == "local"
+    assert s.retrieval_multi_query_enabled is False
+    assert s.retrieval_multi_query_max_variants == 3
+    assert s.retrieval_reranker_enabled is False
     get_settings.cache_clear()
 
 
