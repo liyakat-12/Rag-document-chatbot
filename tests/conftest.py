@@ -56,11 +56,6 @@ async def client(db_engine) -> AsyncGenerator[AsyncClient, None]:
     app = create_app()
     app.dependency_overrides[get_db] = _override_db
 
-    # Tests skip lifespan warmup — mark API ready so /health matches production-after-boot
-    from backend.app.runtime_state import mark_ready
-
-    mark_ready("test")
-
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac

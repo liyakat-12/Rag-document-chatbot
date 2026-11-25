@@ -1,0 +1,19 @@
+{
+  "name": "original_v1",
+  "description": "Frozen pre-release-1 defaults: full-chunk extractive, all quality flags off.",
+  "retriever_top_k": 4,
+  "span_min_overlap": 0.5,
+  "llm_provider": "extractive",
+  "embedding_provider": "local",
+  "hybrid_search_weight": 0.5,
+  "chunk_size": 1000,
+  "chunk_overlap": 200,
+  "answer_sentence_select": false,
+  "answer_sentence_select_mode": "term",
+  "answer_refuse_zero_overlap": false,
+  "ingest_fix_hyphenation": false,
+  "refusal_enabled": false,
+  "retrieval_reranker_enabled": false,
+  "chat_rewrite_followups": false,
+  "ingest_strip_repeated_headers_footers": false
+}

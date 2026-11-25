@@ -1,25 +1,5 @@
 # Decisions log (unattended sessions)
 
-## 2026-11-14 — Offline defaults (Release-1 Stage 2)
-
-**Decision:** Default `llm_provider=extractive` and `embedding_provider=local`.
-Cloud providers require explicit env + API key; invalid combos raise a friendly
-`RuntimeError` / validation message (no stack dump to operators).
-
-**Alternatives:** Keep openai default; soft-warn without failing.
-
-**Reason:** Portfolio demo must run with zero `.env`. Warmup is async; `/health`
-reports `starting` until embeddings/indexes are ready.
-
-## 2026-11-14 — Release-1 excludes DOCX WIP
-
-**Decision:** Do not merge `unattended-3-docx-wip` into `release-1`.
-
-**Alternatives:** Merge and add `ingest_docx_enabled=false` first; merge as-is.
-
-**Reason:** Brief required DOCX behind a flag; the WIP enables `.docx` by default
-without an off switch. Tests on that branch passed (115) but flag gate was unmet.
-
 ## 2026-11-13 — Behaviour snapshot source
 
 **Decision:** Snapshot default retrieval + extractive answers against the isolated
