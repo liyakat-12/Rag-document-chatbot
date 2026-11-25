@@ -120,3 +120,23 @@ keyed by path+mtime+page+span+dpi. Dependency: `pymupdf>=1.24,<2.2`.
 
 **Reason:** Works offline in Streamlit without a JS PDF stack; cache keeps
 rerenders cheap; fallbacks cover noisy PDF text extraction.
+
+
+## 2026-11-25 — Multi-query retrieval and final reranking
+
+**Decision:** Add general multi-query expansion behind
+`retrieval_multi_query_enabled=false` by default. The original user query is
+always included; additional LLM rewrites are bounded and deduplicated. Offline
+extractive mode uses a keyword-focused variant instead of requiring a chat API.
+Each query retrieves a wider hybrid FAISS + BM25 candidate list without applying
+the reranker independently. Candidate lists are merged with weighted RRF, then
+the existing optional cross-encoder reranker is applied once to the union.
+
+**Alternatives:** Always-on rewriting; rerank each query independently; replace
+the existing reranker with a second implementation.
+
+**Reason:** Preserve release-1 behaviour snapshots and avoid duplicate cross-encoder
+work. Original-query dense/sparse rankings remain attached to the retrieval result
+for the existing refusal diagnostics. Candidate retrieval does not record per-query
+latency as separate user requests; the chat request records the combined retrieval
+latency. Retrieval cache mode keys include multi-query settings.
