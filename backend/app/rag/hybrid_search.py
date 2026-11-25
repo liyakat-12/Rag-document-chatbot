@@ -175,6 +175,10 @@ def hybrid_search_detailed(
     query: str,
     k: int | None = None,
     document_ids: Optional[list[str]] = None,
+    *,
+    apply_reranker: bool = True,
+    apply_dedupe: bool = True,
+    record_metrics: bool = True,
 ) -> HybridSearchResult:
     """Hybrid retrieval with timing and per-retriever diagnostics."""
     settings = get_settings()
@@ -215,7 +219,8 @@ def hybrid_search_detailed(
     sparse = [(d, s) for d, s in sparse if s > 0.0]
     if not dense and not sparse:
         total_ms = (time.perf_counter() - t0) * 1000
-        record_chat_timings(retrieval_ms=total_ms, faiss_ms=dense_ms, bm25_ms=sparse_ms)
+        if record_metrics:
+            record_chat_timings(retrieval_ms=total_ms, faiss_ms=dense_ms, bm25_ms=sparse_ms)
         return HybridSearchResult(
             results=[],
             dense_results=[],
@@ -242,9 +247,9 @@ def hybrid_search_detailed(
 
     # Keep a wider candidate pool when optional rerank/dedupe flags are on
     pool_limit = top_k
-    if getattr(settings, "retrieval_reranker_enabled", False) or getattr(
-        settings, "retrieval_dedupe_near_duplicates", False
-    ):
+    reranker_enabled = apply_reranker and getattr(settings, "retrieval_reranker_enabled", False)
+    dedupe_enabled = apply_dedupe and getattr(settings, "retrieval_dedupe_near_duplicates", False)
+    if reranker_enabled or dedupe_enabled:
         pool_limit = max(top_k * 3, int(getattr(settings, "retrieval_reranker_top_n", 16)))
 
     seen: set[str] = set()
@@ -260,7 +265,7 @@ def hybrid_search_detailed(
 
     rerank_ms = 0.0
     rr_info: dict[str, Any] = {"enabled": False}
-    if getattr(settings, "retrieval_reranker_enabled", False) and deduped:
+    if reranker_enabled and deduped:
         from backend.app.rag.reranker import rerank_candidates
 
         n = int(getattr(settings, "retrieval_reranker_top_n", 16))
@@ -268,7 +273,7 @@ def hybrid_search_detailed(
         deduped, rr_info = rerank_candidates(query, deduped[:n])
         rerank_ms = (time.perf_counter() - t_rr) * 1000
 
-    if getattr(settings, "retrieval_dedupe_near_duplicates", False):
+    if dedupe_enabled:
         from backend.app.rag.dedupe import dedupe_near_duplicates
 
         deduped = dedupe_near_duplicates(deduped)
@@ -282,7 +287,8 @@ def hybrid_search_detailed(
         normalized = []
 
     total_ms = (time.perf_counter() - t0) * 1000
-    record_chat_timings(retrieval_ms=total_ms, faiss_ms=dense_ms, bm25_ms=sparse_ms)
+    if record_metrics:
+        record_chat_timings(retrieval_ms=total_ms, faiss_ms=dense_ms, bm25_ms=sparse_ms)
     details: dict[str, Any] = {
         "strategy": "hybrid_rrf",
         "parallel": True,
