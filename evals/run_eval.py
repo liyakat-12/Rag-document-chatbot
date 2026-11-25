@@ -14,6 +14,7 @@ Usage (from repo root, venv active):
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import platform
 import sys
@@ -35,8 +36,11 @@ def _load_cases() -> list[dict]:
 
 def eval_retrieval_local() -> dict:
     """Evaluate hybrid retrieval against an existing FAISS index (if present)."""
-    from backend.app.rag.hybrid_search import hybrid_search_detailed
-    from backend.app.rag.qa_chain import NOT_FOUND_MESSAGE, expand_followup_query
+    from backend.app.rag.qa_chain import (
+        NOT_FOUND_MESSAGE,
+        expand_followup_query,
+        retrieve_detailed,
+    )
     from backend.app.rag.vector_store import get_vector_store
 
     store = get_vector_store()
@@ -50,7 +54,7 @@ def eval_retrieval_local() -> dict:
     for case in cases:
         q = case["question"]
         t0 = time.perf_counter()
-        detailed = hybrid_search_detailed(q)
+        detailed = asyncio.run(retrieve_detailed(q))
         ms = (time.perf_counter() - t0) * 1000
         latencies.append(ms)
         joined = " ".join(d.page_content for d, _ in detailed.results).lower()
@@ -69,6 +73,17 @@ def eval_retrieval_local() -> dict:
                 "faiss_ms": (detailed.details.get("semantic") or {}).get("latency_ms"),
                 "bm25_ms": (detailed.details.get("bm25") or {}).get("latency_ms"),
                 "parallel": detailed.details.get("parallel"),
+                "retrieval_strategy": detailed.details.get("strategy"),
+                "query_variants": detailed.details.get("query_variants", [q]),
+                "reranker": (
+                    (detailed.details.get("reranker") or {}).get("model")
+                    or (detailed.details.get("reranker") or {}).get("fallback")
+                    or (
+                        "enabled"
+                        if (detailed.details.get("reranker") or {}).get("enabled")
+                        else "disabled"
+                    )
+                ),
             }
         )
 
@@ -88,6 +103,9 @@ def eval_retrieval_local() -> dict:
             sum(1 for r in rows if r["keyword_hit"]) / len(rows) if rows else 0.0
         ),
         "followup_expansion_ok": followup_ok,
+        "retrieval_mode": (
+            rows[0].get("retrieval_strategy") if rows else "unknown"
+        ),
         "not_found_message": NOT_FOUND_MESSAGE,
         "latency_ms": {
             "avg": round(sum(latencies) / len(latencies), 2) if latencies else None,
