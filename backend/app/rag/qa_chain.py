@@ -320,6 +320,10 @@ async def retrieve_detailed(
     details: dict[str, Any] = {
         "strategy": "multi_query_hybrid_rrf",
         "top_k": top_k,
+        "parallel": True,
+        "rrf_k": primary.details.get("rrf_k"),
+        "dense_weight": primary.details.get("dense_weight"),
+        "sparse_weight": primary.details.get("sparse_weight"),
         "query_rewriting": rewrite_info,
         "query_variants": variants,
         "candidate_k": candidate_k,
@@ -353,7 +357,8 @@ async def retrieve_detailed(
     return HybridSearchResult(
         results=results,
         details=details,
-        # Preserve original-query rank lists for the existing refusal diagnostics.
+        # Prefer original-query evidence; fall back to the first variant with hits
+        # so the existing refusal diagnostics do not see an empty ranking by default.
         dense_results=signal_source.dense_results,
         sparse_results=signal_source.sparse_results,
     )
