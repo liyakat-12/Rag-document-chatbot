@@ -188,3 +188,9 @@ class SystemInfo(BaseModel):
     semantic_cache_threshold: float
     max_upload_size_mb: int
     app_env: str
+    retrieval_multi_query_enabled: bool = False
+    retrieval_multi_query_max_variants: int = 3
+    retrieval_multi_query_candidate_multiplier: int = 4
+    retrieval_reranker_enabled: bool = False
+    retrieval_reranker_top_n: int = 16
+    retrieval_reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
