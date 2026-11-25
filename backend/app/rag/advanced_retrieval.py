@@ -183,11 +183,20 @@ async def retrieve_advanced(
     recent_history: str = "",
 ):
     """Rewrite -> multi-query hybrid retrieval -> deduplicate -> rerank."""
-    from backend.app.rag.hybrid_search import hybrid_search_detailed, _doc_key, RRF_K
+    from backend.app.rag.hybrid_search import (
+        hybrid_search_detailed,
+        _doc_key,
+        RRF_K,
+        ensure_bm25,
+    )
 
     variants, rewrite_details = await rewrite_query(question, recent_history=recent_history)
     if not variants:
         variants = [_clean_query(question)]
+
+    # Build the shared sparse index once before concurrent query tasks begin.
+    # Otherwise the first parallel BM25 calls can race to initialize it.
+    await asyncio.to_thread(ensure_bm25)
 
     # Query variants are searched independently. Their fused rankings are
     # merged through RRF so one verbose rewrite cannot dominate by raw score.
