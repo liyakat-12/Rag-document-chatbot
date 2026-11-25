@@ -62,9 +62,14 @@ def _mode_key() -> str:
     refusal_h = refusal_config_hash(settings)
     rerank_s = reranker_state_for_cache()
     bm25_tok = getattr(settings, "retrieval_bm25_tokenizer", "whitespace")
+    multi_query = "{}:{}:{}".format(
+        int(getattr(settings, "retrieval_multi_query_enabled", False)),
+        getattr(settings, "retrieval_multi_query_max_variants", 3),
+        getattr(settings, "retrieval_multi_query_candidate_multiplier", 4),
+    )
     return (
         f"{settings.llm_provider}|{settings.embedding_provider}|{settings.openai_chat_model}"
-        f"|refusal:{refusal_h}|rerank:{rerank_s}|bm25:{bm25_tok}"
+        f"|refusal:{refusal_h}|rerank:{rerank_s}|bm25:{bm25_tok}|multiq:{multi_query}"
         f"|exboost:{int(getattr(settings, 'retrieval_exact_match_boost', False))}"
         f"|dedupe:{int(getattr(settings, 'retrieval_dedupe_near_duplicates', False))}"
         f"|citeval:{int(getattr(settings, 'citations_validate', False))}"
