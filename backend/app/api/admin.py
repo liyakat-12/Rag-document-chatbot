@@ -15,6 +15,13 @@ APP_VERSION = "1.2.0"
 router = APIRouter(tags=["admin"])
 
 
+def _retrieval_strategy(settings) -> str:
+    strategy = "multi_query_hybrid_rrf" if settings.retrieval_multi_query_enabled else "hybrid_rrf"
+    if settings.retrieval_reranker_enabled:
+        strategy += "+cross_encoder_rerank"
+    return strategy
+
+
 @router.get("/health", response_model=HealthResponse)
 async def health() -> HealthResponse:
     settings = get_settings()
@@ -24,7 +31,7 @@ async def health() -> HealthResponse:
         version=APP_VERSION,
         llm_provider=settings.llm_provider,
         embedding_provider=settings.embedding_provider,
-        retrieval_strategy="hybrid_rrf",
+        retrieval_strategy=_retrieval_strategy(settings),
         ready=True,
     )
 
@@ -92,4 +99,10 @@ async def system_info() -> SystemInfo:
         semantic_cache_threshold=settings.semantic_cache_threshold,
         max_upload_size_mb=settings.max_upload_size_mb,
         app_env=settings.app_env,
+        retrieval_multi_query_enabled=settings.retrieval_multi_query_enabled,
+        retrieval_multi_query_max_variants=settings.retrieval_multi_query_max_variants,
+        retrieval_multi_query_candidate_multiplier=settings.retrieval_multi_query_candidate_multiplier,
+        retrieval_reranker_enabled=settings.retrieval_reranker_enabled,
+        retrieval_reranker_top_n=settings.retrieval_reranker_top_n,
+        retrieval_reranker_model=settings.retrieval_reranker_model,
     )
