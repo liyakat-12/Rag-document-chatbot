@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import re
 import time
+import threading
 from typing import Any
 
 from langchain_core.documents import Document as LCDocument
@@ -31,6 +32,7 @@ _STOPWORDS = {
 }
 _cross_encoder: Any = None
 _cross_encoder_model_name: str | None = None
+_cross_encoder_lock = threading.Lock()
 
 
 def _clean_query(value: str) -> str:
@@ -41,6 +43,8 @@ def _clean_query(value: str) -> str:
 def _parse_query_variants(raw: str, original: str, max_variants: int) -> list[str]:
     """Parse newline/bullet-separated LLM output and constrain it."""
     candidates = [original]
+    if max_variants <= 1:
+        return candidates
     for line in (raw or "").splitlines():
         item = re.sub(r"^\s*(?:[-*•]|\d+[.)])\s*", "", line).strip().strip('"')
         item = _clean_query(item)
@@ -115,11 +119,14 @@ def _get_cross_encoder():
     model_name = settings.reranker_model
     if _cross_encoder is not None and _cross_encoder_model_name == model_name:
         return _cross_encoder
-    from sentence_transformers import CrossEncoder
+    with _cross_encoder_lock:
+        if _cross_encoder is not None and _cross_encoder_model_name == model_name:
+            return _cross_encoder
+        from sentence_transformers import CrossEncoder
 
-    _cross_encoder = CrossEncoder(model_name, max_length=settings.reranker_max_length)
-    _cross_encoder_model_name = model_name
-    return _cross_encoder
+        _cross_encoder = CrossEncoder(model_name, max_length=settings.reranker_max_length)
+        _cross_encoder_model_name = model_name
+        return _cross_encoder
 
 
 def rerank_documents(
@@ -143,6 +150,9 @@ def rerank_documents(
         model = _get_cross_encoder()
         pairs = [(query, doc.page_content[: settings.reranker_max_length * 4]) for doc, _ in candidates]
         scores = model.predict(pairs, show_progress_bar=False)
+        if hasattr(scores, "tolist"):
+            scores = scores.tolist()
+        scores = list(scores)
         scored = [
             (doc, float(score))
             for (doc, _), score in zip(candidates, scores)
@@ -206,15 +216,18 @@ async def retrieve_advanced(
         rerank_documents, question, candidates, get_settings().retriever_top_k
     )
 
-    # Map model relevance logits to a bounded display/confidence scale only
-    # for UI display. This is a monotonic normalization, not a probability.
-    if rerank_details.get("method") == "cross_encoder" and reranked:
+    # Scores are display heuristics, not calibrated relevance probabilities.
+    # Keep the range comparable across reranker and safe RRF-fallback modes.
+    if reranked and rerank_details.get("method") == "cross_encoder":
         values = [score for _, score in reranked]
         low, high = min(values), max(values)
         if high > low:
             reranked = [(doc, (score - low) / (high - low)) for doc, score in reranked]
         else:
             reranked = [(doc, 1.0) for doc, _ in reranked]
+    elif reranked:
+        max_score = max((score for _, score in reranked), default=0.0) or 1.0
+        reranked = [(doc, score / max_score) for doc, score in reranked]
 
     from backend.app.rag.hybrid_search import HybridSearchResult
     details = {
