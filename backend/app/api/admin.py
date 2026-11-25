@@ -24,7 +24,7 @@ async def health() -> HealthResponse:
         version=APP_VERSION,
         llm_provider=settings.llm_provider,
         embedding_provider=settings.embedding_provider,
-        retrieval_strategy="hybrid_rrf",
+        retrieval_strategy="advanced_hybrid_rrf_rerank",
     )
 
 
@@ -59,6 +59,11 @@ async def system_info() -> SystemInfo:
         retrieval_strategy="hybrid_rrf",
         retriever_top_k=settings.retriever_top_k,
         hybrid_search_weight=settings.hybrid_search_weight,
+        query_rewriting_enabled=settings.query_rewriting_enabled,
+        query_rewrite_max_variants=settings.query_rewrite_max_variants,
+        reranker_enabled=settings.reranker_enabled,
+        reranker_model=settings.reranker_model,
+        reranker_candidate_multiplier=settings.reranker_candidate_multiplier,
         chunk_size=settings.chunk_size,
         chunk_overlap=settings.chunk_overlap,
         semantic_cache_enabled=settings.semantic_cache_enabled,
