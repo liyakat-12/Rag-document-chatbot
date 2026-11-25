@@ -13,6 +13,11 @@ async def test_health(client: AsyncClient):
     data = res.json()
     assert data["status"] == "ok"
     assert "llm_provider" in data
+    assert data["retrieval_strategy"] == (
+        "multi_query+hybrid_rrf+cross_encoder_rerank"
+    )
+    assert data["query_rewriting_enabled"] is True
+    assert data["reranker_enabled"] is True
 
 
 @pytest.mark.asyncio
