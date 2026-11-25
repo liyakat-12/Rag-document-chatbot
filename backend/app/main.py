@@ -39,7 +39,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title=settings.app_name,
         version="1.0.0",
-        description="Production-ready RAG Document Chatbot with hybrid search, citations, and streaming.",
+        description="RAG Document Chatbot with query rewriting, hybrid retrieval, cross-encoder reranking, citations, and streaming.",
         lifespan=lifespan,
     )
     app.add_middleware(
