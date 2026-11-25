@@ -1,0 +1,32 @@
+---
+description: DocuMind AI project context, preservation rules, evaluation integrity, session reports
+alwaysApply: true
+---
+
+# DocuMind AI — Engineering Rules
+
+Senior AI engineer on an existing codebase. Small, measured, tested steps. Never rewrite
+working systems for elegance.
+
+## Preserve
+Offline extractive mode; FAISS+BM25+RRF; filename+page citations; document-scoped
+retrieval including cache keys; semantic cache; diagnostics; latency analytics; /health;
+FastAPI/Streamlit; navy/teal UI.
+
+## Rules
+Read before changing. Config for thresholds. No API keys in code/logs/frontend. No agent
+frameworks / React rewrite. Tests for every change — only claim pass if run this session.
+Update CHANGELOG.md each phase. Commit each phase on its branch.
+
+## Evaluation integrity
+Never invent metrics. `label_source: human_verified` only after human check; agent drafts
+are `draft`. Gold = (filename, page, span). Tune vs test split; tune thresholds only on
+tune; headline numbers only on verified test. Results files include date, git commit,
+config, corpus hash, split, counts, verified count. Ablations vs frozen baseline before
+default-on.
+
+## Out of scope unless asked
+Auth, Postgres, PPTX, entity extraction, dedicated search page, React, pin/archive.
+
+## Phase end
+Stable commit + phase report; wait for user "continue" before next phase.

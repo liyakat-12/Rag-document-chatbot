@@ -2,285 +2,201 @@
 
 **Ask your documents. Get grounded answers.**
 
-Enterprise-style **Retrieval-Augmented Generation (RAG)** assistant for private PDFs.
-Upload documents, ask questions, and receive answers with source citations, grounding confidence, and hybrid retrieval diagnostics.
+Private PDF question-answering with **hybrid retrieval** (FAISS + BM25 → Reciprocal Rank Fusion), citations, offline extractive answering, and measurable latency instrumentation.
 
 ---
 
 ## Problem
 
-Teams need trustworthy answers from their own PDFs — resumes, policies, manuals — without sending everything to a black-box chatbot that invents facts.
+Teams need trustworthy answers from their own PDFs — resumes, policies, manuals — without inventing facts or mixing evidence across unrelated files.
 
 ## Solution
 
-DocuMind AI indexes your PDFs locally, retrieves evidence with **FAISS + BM25 → RRF fusion**, then answers only from that context. If evidence is missing, it says so.
-
----
-
-## Features
-
-- Multi-PDF upload (40 MB) with real ingestion stage timings
-- Hybrid retrieval (semantic + keyword) with expandable retrieval details
-- Grounded answers, citations, heuristic grounding confidence
-- Streaming chat, conversation history, follow-up query expansion
-- Semantic cache, thumbs feedback, PDF conversation export
-- Documents / Analytics / Settings / About UI
-- Light & dark enterprise themes
-- Offline **extractive** mode + local FastEmbed embeddings
-- Optional OpenAI / Azure OpenAI / Anthropic LLMs
-- Docker Compose, tests, and an evaluation harness
+DocuMind indexes PDFs locally, retrieves evidence with dense + sparse search fused by RRF, then answers only from that context. If evidence is missing, it says so. External LLMs are optional; **extractive mode works fully offline**.
 
 ---
 
 ## Architecture
 
 ```
-                ┌─────────────────┐
-                │   PDF Upload    │
-                └────────┬────────┘
-                         ↓
-                ┌─────────────────┐
-                │ Text Extraction │
-                └────────┬────────┘
-                         ↓
-                ┌─────────────────┐
-                │    Chunking     │
-                └────────┬────────┘
-                         ↓
-                ┌─────────────────┐
-                │   Embeddings    │
-                └────────┬────────┘
-                         ↓
-                ┌─────────────────────┐
-                │ FAISS + BM25 Index  │
-                └──────────┬──────────┘
-                           │
-Question ───────────────→ Retrieval
-                           ↓
-                    Hybrid Fusion (RRF)
-                           ↓
-                    Context Builder
-                           ↓
-                         LLM / Extractive
-                           ↓
-                Answer + Citations
+PDF upload → extract → chunk (+ page metadata)
+        → FastEmbed (local) → FAISS
+        → BM25 index
+Question → (optional semantic cache)
+        → parallel FAISS + BM25 → RRF fusion → top-k context
+        → Extractive / OpenAI / Azure / Anthropic
+        → Answer + citations + retrieval-strength score + timings
 ```
 
-### Hybrid retrieval
-
-1. **Semantic (FAISS)** — finds paraphrased / meaning-similar chunks  
-2. **Keyword (BM25)** — finds exact lexical matches  
-3. **RRF fusion** — combines rankings (`HYBRID_SEARCH_WEIGHT` = dense weight)
-
----
-
-## Technology stack
-
-| Layer | Tech |
-|-------|------|
+| Layer | Choice |
+|-------|--------|
+| API | FastAPI |
 | UI | Streamlit |
-| API | FastAPI + Uvicorn + SSE |
-| RAG | LangChain |
-| Vectors | FAISS (`IndexFlatL2`) |
-| Keywords | rank-bm25 |
-| Embeddings | FastEmbed (`BAAI/bge-small-en-v1.5`) or OpenAI |
-| PDF | pypdf |
-| DB | SQLite + SQLAlchemy + aiosqlite |
+| Embeddings | FastEmbed `BAAI/bge-small-en-v1.5` (default) |
+| Vectors | FAISS (L2 → similarity) |
+| Sparse | BM25 (`rank_bm25`) |
+| Fusion | Weighted Reciprocal Rank Fusion |
+| LLM | `extractive` (default) · OpenAI · Azure · Anthropic |
+| DB | SQLite (documents, chats, semantic cache) |
 
 ---
 
-## Project structure
+## Features
 
-```
-RAG_Document_Chatbot/
-├── backend/app/          # FastAPI + RAG pipeline
-│   ├── api/              # documents, chat, admin
-│   ├── rag/              # ingest, FAISS, BM25, QA, LLM factory
-│   ├── services/         # orchestration
-│   └── db/               # SQLAlchemy models
-├── streamlit_app/        # DocuMind AI UI
-│   ├── components/       # chat, documents, analytics, …
-│   └── styles/           # light/dark themes
-├── evals/                # retrieval / groundedness evaluation
-├── tests/
-├── uploads/ · vector_store/ · data/
-├── docker-compose.yml
-└── requirements.txt
-```
+- Multi-PDF upload with stage timings (extract → chunk → embed → BM25)
+- **Search in** document scope (enforced in retrieval + cache keys)
+- Hybrid diagnostics expandable under each answer
+- Streaming chat with citations and copy/export
+- Semantic cache scoped by documents + answering mode
+- Analytics: cache hit rate + rolling latency p50/p95
+- Offline extractive answers; optional cloud synthesis
+- Eval harness: `python -m evals.run_eval`
 
 ---
 
-## Installation
+## Quick start
+
+**Requirements:** Python 3.11+ (3.11 or 3.12), Windows/macOS/Linux.
 
 ```bash
-cd RAG_Document_Chatbot
-copy .env.example .env          # Windows
-# cp .env.example .env          # macOS/Linux
+# From repo root
+python -m venv .venv
 
-py -3.12 -m venv .venv
-.venv\Scripts\activate          # Windows
-# source .venv/bin/activate     # macOS/Linux
+# Windows
+.venv\Scripts\activate
+# macOS/Linux
+# source .venv/bin/activate
 
 pip install -r requirements.txt
+copy .env.example .env   # or: cp .env.example .env
 ```
 
-Default `.env` uses **extractive** LLM + **local** embeddings (no paid API required).
+### Ports (important)
 
----
+Another app often occupies **8000** on this machine. DocuMind prefers:
 
-## Configuration
-
-See `.env.example`. Important keys:
-
-| Variable | Meaning |
-|----------|---------|
-| `LLM_PROVIDER` | `extractive` · `openai` · `azure_openai` · `anthropic` |
-| `EMBEDDING_PROVIDER` | `local` · `openai` |
-| `RETRIEVER_TOP_K` | Fused chunks returned |
-| `HYBRID_SEARCH_WEIGHT` | Dense weight in RRF |
-| `MAX_UPLOAD_SIZE_MB` | Default 40 |
-
-Never commit `.env` or API keys.
-
----
-
-## Running locally
-
-**Backend**
+| Service | Default |
+|---------|---------|
+| Backend API | **8001** if 8000 is busy (`run_backend.bat` auto-selects) |
+| Streamlit UI | **8501** |
 
 ```bash
-uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
-```
+# Terminal 1 — API
+uvicorn backend.app.main:app --host 127.0.0.1 --port 8001
 
-API docs: http://localhost:8000/docs
-
-**UI**
-
-```bash
+# Terminal 2 — UI
 streamlit run streamlit_app/app.py --server.port 8501
 ```
 
-UI: http://localhost:8501
+**Windows one-command:** double-click `run_documind.bat` — starts backend + UI, skips services that are already healthy, writes `.uvicorn_*.log` / `.streamlit_*.log`. Existing `run_backend.bat` and `run_frontend.bat` still work for separate terminals.
 
-Or use `run_backend.bat` / `run_frontend.bat` on Windows.
+- API docs: http://127.0.0.1:8001/docs  
+- Health: http://127.0.0.1:8001/api/v1/health  
+- Ready: http://127.0.0.1:8001/api/v1/ready  
+- UI: http://127.0.0.1:8501  
 
----
+The Streamlit app **refuses** to attach to a non-DocuMind process on the same port. Sidebar health shows Connected / Checking / Unavailable from a live `/health` probe (short TTL, refreshable).
 
-## Docker
+### Default configuration
 
-```bash
-docker compose up --build -d
+```env
+LLM_PROVIDER=extractive
+EMBEDDING_PROVIDER=local
 ```
 
-- UI: http://localhost:8501  
-- API: http://localhost:8000  
+For OpenAI synthesis (sends retrieved context to OpenAI):
 
-Data persists in Docker volumes (`uploads`, `vector_store`, `data`).
-
----
-
-## Deploy
-
-### Option A — Streamlit Community Cloud (easiest public URL)
-
-Your app already boots FastAPI **in-process** via `streamlit_app/backend_runtime.py`, so one Streamlit service is enough.
-
-1. Push this repo to GitHub (exclude `.env` — already gitignored).
-2. Go to [share.streamlit.io](https://share.streamlit.io) → **New app**.
-3. Select repo `liyakat-12/Rag-document-chatbot`, branch `main`.
-4. Main file path: `streamlit_app/app.py`
-5. Python version: **3.12**
-6. In **Advanced settings → Secrets**, paste values from `streamlit_app/.streamlit/secrets.toml.example` and set your real `OPENAI_API_KEY` (or use `LLM_PROVIDER = "extractive"` with no key).
-7. Deploy.
-
-Notes:
-- Free Cloud has limited CPU/RAM; local FastEmbed may be slow on first run.
-- Uploaded docs on Cloud are ephemeral unless you add external storage later.
-
-### Option B — Docker on a VPS (DigitalOcean / AWS / Azure VM)
-
-1. Install Docker + Compose on the server.
-2. Copy the project (or `git clone`) and create `.env` from `.env.example`.
-3. Run:
-
-```bash
-docker compose up --build -d
+```env
+LLM_PROVIDER=openai
+OPENAI_API_KEY=sk-...
 ```
 
-4. Open firewall ports **8501** (UI) and optionally **8000** (API).
-5. Point a domain / reverse proxy (Nginx/Caddy) at port 8501.
-
-### Option C — Hugging Face Spaces (good public demo)
-
-**Yes — HF is a solid choice** for this app (better than Vercel).
-
-1. Push the repo to GitHub.
-2. Create a Space: [huggingface.co/new-space](https://huggingface.co/new-space)
-   - SDK: **Docker**
-   - Connect your GitHub repo
-3. Space reads the root `Dockerfile` (Streamlit on port **7860**, API in-process).
-4. Optional: copy Space card text from `README_HF.md` into the Space README.
-5. Add secrets under **Settings → Variables and secrets** (see `README_HF.md`).
-
-UI URL will look like: `https://huggingface.co/spaces/<you>/documind-ai`
-
----
-
-### Option D — Keep running locally
-
-```bash
-uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
-streamlit run streamlit_app/app.py --server.port 8501
-```
-
----
-
-## Example usage
-
-1. Open **Documents** → upload a PDF → confirm pipeline stages → **Document ready**  
-2. Open **Chat** → try a suggested question  
-3. Inspect **Sources**, **Grounding confidence**, and optional **Retrieval details**  
-4. Rate answers; export the conversation as PDF  
+Never commit `.env`.
 
 ---
 
 ## Evaluation
 
 ```bash
-python -m evals.run_eval           # local retrieval checks (needs indexed docs)
-python -m evals.run_eval --api     # live chat groundedness checks
+python -m evals.run_eval
+python -m evals.run_eval --api --base http://127.0.0.1:8001/api/v1 --out evals/last_report.json
 ```
 
-Dataset: `evals/dataset.json`. Scores are measured, not fabricated.
+**Metric honesty**
+
+| Metric | Status |
+|--------|--------|
+| Keyword hit rate on retrieved text | Measured when index has content |
+| Retrieval latency p50/p95 | Measured |
+| Recall@K / MRR | Marked **unavailable** unless gold chunk IDs exist |
+| Cache hit rate | From live admin stats |
+
+Do not invent Recall@K numbers for resumes.
 
 ---
 
 ## Testing
 
 ```bash
-pytest -q
+pytest tests/unit -q
 ```
+
+---
+
+## API sketch
+
+```http
+GET  /api/v1/health
+GET  /api/v1/ready
+POST /api/v1/upload
+GET  /api/v1/documents
+POST /api/v1/chat          # { "message", "session_id?", "document_ids?", "stream": false }
+POST /api/v1/chat/stream
+GET  /api/v1/admin/stats   # includes latency window
+```
+
+---
+
+## Privacy & security
+
+- Uploads and vector indexes stay under `uploads/` and `vector_store/` (gitignored).
+- API keys stay on the backend; UI never displays secrets.
+- External LLM mode is labeled in the UI.
+- Delete document removes vectors, file, and clears semantic cache.
 
 ---
 
 ## Limitations
 
-- Extractive mode returns grounded snippets, not fluent generative prose  
-- Confidence is a **heuristic** from retrieval scores, not a calibrated probability  
-- BM25 lives in memory and is rebuilt after index changes  
-- No built-in multi-user authentication on the API  
+- Extractive mode quotes passages; it does not rewrite like a chat LLM.
+- Scanned PDFs without text layer are not OCR’d.
+- Retrieval-strength % is a heuristic, not calibrated accuracy.
+- Latency metrics are in-process (reset on backend restart).
+- Single-user / local deployment by default (no multi-tenant auth).
 
 ---
 
-## Future improvements
+## Design trade-offs
 
-- Auth / multi-tenant workspaces  
-- Persistent BM25 + async ingest progress SSE  
-- Stronger query rewriting for follow-ups  
-- Richer evaluation (RAGAS / human labels)  
+1. **Hybrid RRF** — balances paraphrase recall (FAISS) with exact-term precision (BM25).
+2. **Local embeddings by default** — predictable cost; no embedding quota failures.
+3. **Extractive default** — demos and interviews work without a paid key.
+4. **Cache scoped by docs + mode** — correctness over hit rate.
+5. **Parallel FAISS+BM25** — cuts wall-clock retrieval when both paths are non-trivial.
 
 ---
 
-## License
+## Roadmap
 
-Use and modify for your projects. Keep secrets out of git.
+- Optional cross-encoder reranker behind a flag + eval delta
+- Gold chunk-ID eval set for true Recall@K / MRR
+- Optional OCR path for scanned PDFs
+- Multi-user auth for shared deployments
+
+---
+
+## Resume bullets (fill measured numbers after you run evals)
+
+- Built a hybrid RAG system (FAISS + BM25 → RRF) with document-scoped retrieval, citation metadata, and offline extractive answering.
+- Instrumented end-to-end latency (FAISS / BM25 / generation / total p50–p95) exposed in analytics; parallelized dense+sparse retrieval.
+- Hardened semantic cache keys by document scope and answering mode; added regression tests for extractive punctuation matching and cache isolation.

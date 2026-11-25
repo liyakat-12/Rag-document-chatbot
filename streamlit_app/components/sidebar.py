@@ -1,16 +1,60 @@
-"""Sidebar — brand, new chat, documents snapshot, conversations, settings nav."""
+"""Sidebar — brand, navigation, library snapshot, recent chats."""
 
 from __future__ import annotations
 
-from datetime import datetime
+from html import escape
 from typing import Any, Callable
 
 import streamlit as st
 
 import components._pathfix  # noqa: F401
-from components import fmt_status, friendly_error
+from components import friendly_error, status_dot_class, truncate_at_word
 
-NAV_PAGES = ["Chat", "Documents", "Analytics", "Settings", "About"]
+# Primary nav labels → page keys
+_NAV_PRIMARY = [
+    ("Chat", "Chat", "💬"),
+    ("Library", "Documents", "📚"),
+    ("About", "About", "ℹ"),
+]
+_NAV_MORE = [
+    ("Analytics", "Analytics"),
+    ("Settings", "Settings"),
+]
+
+
+def _go(page: str) -> None:
+    st.session_state.page = page
+    st.session_state["_force_page"] = page
+
+
+def _render_status_dot() -> None:
+    status = st.session_state.get("backend_status") or (
+        "connected" if st.session_state.get("backend_ok") else "unavailable"
+    )
+    provider = st.session_state.get("llm_provider") or "—"
+    if status == "checking":
+        css, label, tip = "is-checking", "Checking", "Probing the API…"
+    elif status == "connected":
+        offline = provider == "extractive"
+        css = "is-offline" if offline else "is-offline"
+        label = "Offline" if offline else "Online"
+        tip = (
+            f"Backend connected · provider={provider}. "
+            "Details in Settings."
+            if not offline
+            else "Offline extractive mode — answers from retrieved passages only. "
+            "Change LLM_PROVIDER in Settings / .env."
+        )
+    else:
+        css, label, tip = (
+            "is-down",
+            "Unavailable",
+            "API unreachable. Start the backend, then retry in Settings.",
+        )
+    st.markdown(
+        f'<div class="status-dot {css}" title="{escape(tip)}">{escape(label)}</div>',
+        unsafe_allow_html=True,
+    )
 
 
 def render_sidebar(
@@ -20,87 +64,113 @@ def render_sidebar(
     on_load_session: Callable[[str], None],
 ) -> None:
     with st.sidebar:
-        st.markdown('<p class="brand-title">DocuMind AI</p>', unsafe_allow_html=True)
+        force = st.session_state.pop("_force_page", None)
+        if force:
+            st.session_state.page = force
+
+        current = st.session_state.get("page") or "Chat"
+
         st.markdown(
-            '<p class="brand-tag">Ask your documents. Get grounded answers.</p>',
+            """
+            <div class="brand-mark">
+              <div class="logo">D</div>
+              <div>
+                <p class="brand-title">DocuMind AI</p>
+              </div>
+            </div>
+            <p class="brand-tag">Private PDFs. Grounded answers. Citations you can verify.</p>
+            """,
             unsafe_allow_html=True,
         )
+        _render_status_dot()
 
-        st.session_state.page = st.radio(
-            "Navigation",
-            NAV_PAGES,
-            index=NAV_PAGES.index(st.session_state.get("page", "Chat"))
-            if st.session_state.get("page", "Chat") in NAV_PAGES
-            else 0,
-            label_visibility="collapsed",
-        )
+        st.markdown('<div class="divider-soft"></div>', unsafe_allow_html=True)
+        st.markdown('<p class="nav-hint">Navigate</p>', unsafe_allow_html=True)
+
+        for label, page, icon in _NAV_PRIMARY:
+            active = "active" if current == page else ""
+            st.markdown(f'<div class="nav-link-btn {active}">', unsafe_allow_html=True)
+            if st.button(
+                f"{icon}  {label}",
+                key=f"nav_{page}",
+                use_container_width=True,
+                on_click=_go,
+                args=(page,),
+            ):
+                pass
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        with st.expander("More", expanded=False):
+            for label, page in _NAV_MORE:
+                if st.button(label, key=f"nav_more_{page}", use_container_width=True):
+                    _go(page)
+                    st.rerun()
+
         st.toggle("Dark mode", key="dark_mode")
 
-        if st.button("+ New Chat", type="primary", use_container_width=True):
+        def _new_chat() -> None:
             on_new_chat()
-            st.session_state.page = "Chat"
-            st.rerun()
+            _go("Chat")
 
-        # --- Documents snapshot ---
-        st.markdown('<p class="nav-hint">Documents</p>', unsafe_allow_html=True)
+        st.button(
+            "New chat",
+            type="primary",
+            use_container_width=True,
+            on_click=_new_chat,
+        )
+
+        st.markdown('<p class="nav-hint">Library</p>', unsafe_allow_html=True)
         try:
-            docs = client_factory().list_documents()
+            docs = client_factory().list_documents() if st.session_state.get("backend_ok") else []
         except Exception:
             docs = []
         indexed = sum(1 for d in docs if (d.get("status") or "").lower() == "indexed")
         st.caption(f"{indexed} indexed · {len(docs)} total")
         if st.button("Manage documents", use_container_width=True):
-            st.session_state.page = "Documents"
+            _go("Documents")
             st.rerun()
-        for d in docs[:5]:
-            name = d.get("original_filename") or "document.pdf"
-            label, _ = fmt_status(d.get("status", ""))
-            st.caption(f"• {name[:34]} — {label}")
+        for d in docs[:6]:
+            full = d.get("original_filename") or "document.pdf"
+            name = truncate_at_word(full, 26)
+            dot = status_dot_class(d.get("status", ""))
+            st.markdown(
+                f'<div class="lib-row" title="{escape(full)}">'
+                f'<span class="lib-dot {dot}"></span>'
+                f"<span>{escape(name)}</span></div>",
+                unsafe_allow_html=True,
+            )
 
-        # --- Conversations ---
-        st.markdown('<p class="nav-hint">Conversations</p>', unsafe_allow_html=True)
         try:
-            sessions = client_factory().list_sessions()
+            sessions = (
+                client_factory().list_sessions() if st.session_state.get("backend_ok") else []
+            )
         except Exception as exc:
             st.caption(friendly_error(exc))
             sessions = []
 
+        st.markdown('<p class="nav-hint">Recent</p>', unsafe_allow_html=True)
         if not sessions:
             st.caption("No conversations yet.")
+        else:
+            for s in sessions[:6]:
+                full_title = s.get("title") or "Untitled"
+                title = truncate_at_word(full_title, 30)
+                sid = s["id"]
 
-        for s in sessions[:20]:
-            title = (s.get("title") or "Untitled")[:42]
-            updated = s.get("updated_at") or s.get("created_at") or ""
-            stamp = ""
-            if updated:
-                try:
-                    dt = datetime.fromisoformat(str(updated).replace("Z", "+00:00"))
-                    stamp = dt.strftime("%b %d · %H:%M")
-                except Exception:
-                    stamp = str(updated)[:16]
+                def _load(session_id: str = sid) -> None:
+                    on_load_session(session_id)
+                    _go("Chat")
 
-            c1, c2 = st.columns([5, 1])
-            with c1:
-                if st.button(title, key=f"sess_{s['id']}", use_container_width=True):
-                    on_load_session(s["id"])
-                    st.session_state.page = "Chat"
-                    st.rerun()
-                if stamp:
-                    st.caption(stamp)
-            with c2:
-                if st.button("×", key=f"del_sess_{s['id']}", help="Delete conversation"):
-                    try:
-                        client_factory().delete_session(s["id"])
-                        if st.session_state.session_id == s["id"]:
-                            on_new_chat()
-                        st.rerun()
-                    except Exception as exc:
-                        st.error(friendly_error(exc))
+                st.markdown('<div class="sess-row">', unsafe_allow_html=True)
+                st.button(
+                    title,
+                    key=f"sess_{sid}",
+                    use_container_width=True,
+                    on_click=_load,
+                    help=full_title,
+                )
+                st.markdown("</div>", unsafe_allow_html=True)
 
-        # --- Settings snapshot ---
-        st.markdown('<p class="nav-hint">Settings</p>', unsafe_allow_html=True)
-        provider = st.session_state.get("llm_provider") or "—"
-        st.caption(f"LLM · `{provider}`")
-        if st.button("Open settings", use_container_width=True):
-            st.session_state.page = "Settings"
-            st.rerun()
+        err = st.session_state.pop("_sidebar_error", None)
+        if err:
+            st.error(err)

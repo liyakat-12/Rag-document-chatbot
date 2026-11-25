@@ -1,35 +1,60 @@
-# Production-oriented Compose for DocuMind AI
-# Usage: docker compose -f docker-compose.yml up --build -d
+# DocuMind AI — offline local stack (no API keys required)
+# Usage:
+#   copy .env.example .env
+#   docker compose up --build
+# Optional model bake-in:
+#   docker compose build --build-arg PRELOAD_MODELS=1
 
 services:
-  backend:
+  api:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        PRELOAD_MODELS: ${PRELOAD_MODELS:-0}
     command: >
       uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
     ports:
       - "8000:8000"
-    env_file:
-      - .env
     environment:
       - PYTHONPATH=/app
+      - LLM_PROVIDER=extractive
+      - EMBEDDING_PROVIDER=local
+      - LOCAL_EMBEDDING_MODEL=BAAI/bge-small-en-v1.5
+      - EMBEDDING_DIMENSIONS=384
+      - FASTEMBED_CACHE_PATH=/models/fastembed
+      - HF_HOME=/models/hf
+      - UPLOAD_DIR=/app/uploads
+      - VECTOR_STORE_DIR=/app/vector_store
+      - DATABASE_URL=sqlite+aiosqlite:///./data/chatbot.db
+    env_file:
+      - path: .env
+        required: false
     volumes:
       - documind_uploads:/app/uploads
       - documind_vectors:/app/vector_store
       - documind_data:/app/data
+      - documind_models:/models
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health')"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health')",
+        ]
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 40s
+      start_period: 60s
 
-  frontend:
+  ui:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        PRELOAD_MODELS: ${PRELOAD_MODELS:-0}
     command: >
       streamlit run streamlit_app/app.py
       --server.port=8501
@@ -38,17 +63,36 @@ services:
     ports:
       - "8501:8501"
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
-      - API_BASE_URL=http://backend:8000/api/v1
-      - MAX_UPLOAD_SIZE_MB=40
       - PYTHONPATH=/app
+      - API_BASE_URL=http://api:8000/api/v1
+      - VITE_API_BASE_URL=http://api:8000/api/v1
+      - MAX_UPLOAD_SIZE_MB=40
+      - LLM_PROVIDER=extractive
+      - EMBEDDING_PROVIDER=local
+    volumes:
+      - documind_models:/models
     depends_on:
-      backend:
+      api:
         condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8501/')",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
 
 volumes:
   documind_uploads:
   documind_vectors:
   documind_data:
+  documind_models:

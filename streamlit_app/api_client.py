@@ -1,4 +1,4 @@
-"""HTTP client for the RAG FastAPI backend."""
+"""HTTP client for the RAG FastAPI backend (persistent keep-alive connection)."""
 
 from __future__ import annotations
 
@@ -7,116 +7,130 @@ from typing import Any, Generator, Optional
 
 import httpx
 
-DEFAULT_BASE = "http://localhost:8000/api/v1"
+DEFAULT_BASE = "http://localhost:8001/api/v1"
 
 
 class RagClient:
+    """Reuse one httpx.Client — opening a new TCP connection per call is a major UI lag source."""
+
     def __init__(self, base_url: str = DEFAULT_BASE, timeout: float = 300.0):
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
+        self._client = httpx.Client(
+            base_url=self.base_url,
+            timeout=httpx.Timeout(timeout, connect=10.0),
+            limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+        )
+
+    def close(self) -> None:
+        self._client.close()
 
     def _url(self, path: str) -> str:
-        return f"{self.base_url}{path}"
+        return path if path.startswith("/") else f"/{path}"
 
     def health(self) -> dict[str, Any]:
-        with httpx.Client(timeout=10.0) as client:
-            r = client.get(self._url("/health"))
-            r.raise_for_status()
-            return r.json()
+        # Short timeout so the sidebar never hangs on an unreachable host
+        r = self._client.get(self._url("/health"), timeout=3.0)
+        r.raise_for_status()
+        return r.json()
 
     def list_documents(self) -> list[dict[str, Any]]:
-        with httpx.Client(timeout=self.timeout) as client:
-            r = client.get(self._url("/documents"))
-            r.raise_for_status()
-            return r.json()
+        r = self._client.get(self._url("/documents"))
+        r.raise_for_status()
+        return r.json()
 
     def upload(self, files: list[tuple[str, bytes, str]]) -> dict[str, Any]:
-        """files: list of (filename, content_bytes, content_type)."""
         multipart = [
             ("files", (name, content, ctype or "application/pdf"))
             for name, content, ctype in files
         ]
-        with httpx.Client(timeout=self.timeout) as client:
-            r = client.post(self._url("/upload"), files=multipart)
-            if r.status_code >= 400:
-                detail = _error_detail(r)
-                raise RuntimeError(detail)
-            return r.json()
+        r = self._client.post(self._url("/upload"), files=multipart)
+        if r.status_code >= 400:
+            raise RuntimeError(_error_detail(r))
+        return r.json()
 
     def delete_document(self, document_id: str) -> dict[str, Any]:
-        with httpx.Client(timeout=self.timeout) as client:
-            r = client.delete(self._url(f"/document/{document_id}"))
-            if r.status_code >= 400:
-                raise RuntimeError(_error_detail(r))
-            return r.json()
+        r = self._client.delete(self._url(f"/document/{document_id}"))
+        if r.status_code >= 400:
+            raise RuntimeError(_error_detail(r))
+        return r.json()
 
     def reindex(self) -> dict[str, Any]:
-        with httpx.Client(timeout=self.timeout) as client:
-            r = client.post(self._url("/reindex"))
-            if r.status_code >= 400:
-                raise RuntimeError(_error_detail(r))
-            return r.json()
+        r = self._client.post(self._url("/reindex"))
+        if r.status_code >= 400:
+            raise RuntimeError(_error_detail(r))
+        return r.json()
 
     def list_sessions(self) -> list[dict[str, Any]]:
-        with httpx.Client(timeout=self.timeout) as client:
-            r = client.get(self._url("/history"))
-            r.raise_for_status()
-            return r.json().get("sessions", [])
+        r = self._client.get(self._url("/history"))
+        r.raise_for_status()
+        return r.json().get("sessions", [])
 
     def get_session(self, session_id: str) -> dict[str, Any]:
-        with httpx.Client(timeout=self.timeout) as client:
-            r = client.get(self._url(f"/history/{session_id}"))
-            if r.status_code >= 400:
-                raise RuntimeError(_error_detail(r))
-            return r.json()
+        r = self._client.get(self._url(f"/history/{session_id}"))
+        if r.status_code >= 400:
+            raise RuntimeError(_error_detail(r))
+        return r.json()
 
     def delete_session(self, session_id: str) -> None:
-        with httpx.Client(timeout=self.timeout) as client:
-            r = client.delete(self._url(f"/history/{session_id}"))
-            if r.status_code >= 400:
-                raise RuntimeError(_error_detail(r))
+        r = self._client.delete(self._url(f"/history/{session_id}"))
+        if r.status_code >= 400:
+            raise RuntimeError(_error_detail(r))
 
-    def chat(self, message: str, session_id: Optional[str] = None) -> dict[str, Any]:
-        with httpx.Client(timeout=self.timeout) as client:
-            r = client.post(
-                self._url("/chat"),
-                json={"message": message, "session_id": session_id, "stream": False},
-            )
-            if r.status_code >= 400:
-                raise RuntimeError(_error_detail(r))
-            return r.json()
+    def chat(
+        self,
+        message: str,
+        session_id: Optional[str] = None,
+        document_ids: Optional[list[str]] = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "message": message,
+            "session_id": session_id,
+            "stream": False,
+        }
+        if document_ids:
+            payload["document_ids"] = document_ids
+        r = self._client.post(self._url("/chat"), json=payload)
+        if r.status_code >= 400:
+            raise RuntimeError(_error_detail(r))
+        return r.json()
 
     def chat_stream(
-        self, message: str, session_id: Optional[str] = None
+        self,
+        message: str,
+        session_id: Optional[str] = None,
+        document_ids: Optional[list[str]] = None,
     ) -> Generator[dict[str, Any], None, None]:
+        """Prefer non-stream chat for extractive — stream kept for cloud LLMs."""
+        payload: dict[str, Any] = {
+            "message": message,
+            "session_id": session_id,
+            "stream": True,
+        }
+        if document_ids:
+            payload["document_ids"] = document_ids
         try:
-            with httpx.Client(timeout=self.timeout) as client:
-                with client.stream(
-                    "POST",
-                    self._url("/chat/stream"),
-                    json={"message": message, "session_id": session_id, "stream": True},
-                ) as response:
-                    if response.status_code >= 400:
-                        response.read()
-                        raise RuntimeError(_error_detail(response))
-                    buffer = ""
-                    for chunk in response.iter_text():
-                        buffer += chunk
-                        while "\n\n" in buffer:
-                            part, buffer = buffer.split("\n\n", 1)
-                            line = part.strip()
-                            if not line.startswith("data:"):
-                                continue
-                            data = line[5:].strip()
-                            if data == "[DONE]":
-                                return
-                            try:
-                                yield json.loads(data)
-                            except json.JSONDecodeError:
-                                continue
+            with self._client.stream("POST", self._url("/chat/stream"), json=payload) as response:
+                if response.status_code >= 400:
+                    response.read()
+                    raise RuntimeError(_error_detail(response))
+                buffer = ""
+                for chunk in response.iter_text():
+                    buffer += chunk
+                    while "\n\n" in buffer:
+                        part, buffer = buffer.split("\n\n", 1)
+                        line = part.strip()
+                        if not line.startswith("data:"):
+                            continue
+                        data = line[5:].strip()
+                        if data == "[DONE]":
+                            return
+                        try:
+                            yield json.loads(data)
+                        except json.JSONDecodeError:
+                            continue
         except httpx.RemoteProtocolError:
-            # Backend closed stream early — fall back to non-streaming chat
-            result = self.chat(message, session_id=session_id)
+            result = self.chat(message, session_id=session_id, document_ids=document_ids)
             yield {
                 "event": "meta",
                 "session_id": result.get("session_id"),
@@ -140,33 +154,61 @@ class RagClient:
             }
 
     def rate_message(self, message_id: str, rating: str) -> dict[str, Any]:
-        with httpx.Client(timeout=self.timeout) as client:
-            r = client.post(
-                self._url(f"/messages/{message_id}/rate"),
-                json={"rating": rating},
-            )
-            if r.status_code >= 400:
-                raise RuntimeError(_error_detail(r))
-            return r.json()
+        r = self._client.post(
+            self._url(f"/messages/{message_id}/rate"),
+            json={"rating": rating},
+        )
+        if r.status_code >= 400:
+            raise RuntimeError(_error_detail(r))
+        return r.json()
 
     def export_pdf(self, session_id: str) -> bytes:
-        with httpx.Client(timeout=self.timeout) as client:
-            r = client.get(self._url(f"/history/{session_id}/export"))
-            if r.status_code >= 400:
-                raise RuntimeError(_error_detail(r))
-            return r.content
+        r = self._client.get(self._url(f"/history/{session_id}/export"))
+        if r.status_code >= 400:
+            raise RuntimeError(_error_detail(r))
+        return r.content
 
     def admin_stats(self) -> dict[str, Any]:
-        with httpx.Client(timeout=self.timeout) as client:
-            r = client.get(self._url("/admin/stats"))
-            r.raise_for_status()
-            return r.json()
+        r = self._client.get(self._url("/admin/stats"))
+        r.raise_for_status()
+        return r.json()
 
     def system_info(self) -> dict[str, Any]:
-        with httpx.Client(timeout=10.0) as client:
-            r = client.get(self._url("/admin/system"))
-            r.raise_for_status()
-            return r.json()
+        r = self._client.get(self._url("/admin/system"), timeout=10.0)
+        r.raise_for_status()
+        return r.json()
+
+    def document_meta(self, document_id: str) -> dict[str, Any]:
+        r = self._client.get(self._url(f"/documents/{document_id}/meta"))
+        if r.status_code >= 400:
+            raise RuntimeError(_error_detail(r))
+        return r.json()
+
+    def document_page_image(
+        self,
+        document_id: str,
+        page_number: int,
+        span: str = "",
+    ) -> tuple[bytes, dict[str, str]]:
+        """Return (png_bytes, response_headers)."""
+        params: dict[str, Any] = {}
+        if span:
+            params["span"] = span
+        r = self._client.get(
+            self._url(f"/documents/{document_id}/pages/{page_number}"),
+            params=params,
+        )
+        if r.status_code >= 400:
+            raise RuntimeError(_error_detail(r))
+        headers = {
+            "match_mode": r.headers.get("X-Match-Mode", ""),
+            "page_count": r.headers.get("X-Page-Count", ""),
+            "page_number": r.headers.get("X-Page-Number", ""),
+            "cache_hit": r.headers.get("X-Cache-Hit", "0"),
+            "filename": r.headers.get("X-Filename", ""),
+            "chunk_fallback": r.headers.get("X-Chunk-Fallback", "0"),
+        }
+        return r.content, headers
 
 
 def _error_detail(response: httpx.Response) -> str:

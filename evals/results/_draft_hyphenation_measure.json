@@ -1,0 +1,8 @@
+{
+  "label": "DRAFT LABELS — NOT FOR REPORTING",
+  "n": 20,
+  "baseline_clean_chunk": 0.65,
+  "with_ingest_fix_hyphenation": null,
+  "enable_by_default": false,
+  "note": "Hyphenation eval-index rebuild did not complete in session (embedding ~3k chunks). Left OFF (safe). Baseline DRAFT key-fact coverage 0.65 on n=20 clean_chunk without hyphenation."
+}

@@ -1,0 +1,299 @@
+[
+  {
+    "file": "sebi_circular_commodity_overseas_fm_2024-04.pdf",
+    "pages_extracted": 2,
+    "chunks": 4,
+    "chars_total": 2682,
+    "chars_per_page_sample": [
+      [
+        1,
+        1840,
+        3
+      ],
+      [
+        2,
+        842,
+        1
+      ]
+    ],
+    "chars_min": 842,
+    "chars_max": 1840,
+    "low_text_pages": [],
+    "long_unsplit": [],
+    "repeated_header_examples": [],
+    "multi_chunk_pages": 1,
+    "chunking_splits_long_pages": true
+  },
+  {
+    "file": "sebi_mf_master_circular_2024-06.pdf",
+    "pages_extracted": 828,
+    "chunks": 1679,
+    "chars_total": 1231029,
+    "chars_per_page_sample": [
+      [
+        1,
+        1256,
+        2
+      ],
+      [
+        2,
+        1841,
+        3
+      ],
+      [
+        3,
+        1091,
+        2
+      ],
+      [
+        4,
+        2509,
+        4
+      ],
+      [
+        5,
+        228,
+        1
+      ]
+    ],
+    "chars_min": 58,
+    "chars_max": 3888,
+    "low_text_pages": [
+      [
+        188,
+        77
+      ],
+      [
+        260,
+        58
+      ],
+      [
+        454,
+        58
+      ],
+      [
+        595,
+        75
+      ],
+      [
+        742,
+        58
+      ],
+      [
+        756,
+        58
+      ]
+    ],
+    "long_unsplit": [],
+    "repeated_header_examples": [],
+    "multi_chunk_pages": 692,
+    "chunking_splits_long_pages": true
+  },
+  {
+    "file": "sid_hdfc_midcap.pdf",
+    "pages_extracted": 73,
+    "chunks": 265,
+    "chars_total": 202283,
+    "chars_per_page_sample": [
+      [
+        1,
+        1985,
+        3
+      ],
+      [
+        2,
+        1052,
+        2
+      ],
+      [
+        3,
+        5489,
+        7
+      ],
+      [
+        4,
+        1802,
+        2
+      ],
+      [
+        5,
+        2332,
+        3
+      ]
+    ],
+    "chars_min": 652,
+    "chars_max": 5489,
+    "low_text_pages": [],
+    "long_unsplit": [],
+    "repeated_header_examples": [],
+    "multi_chunk_pages": 69,
+    "chunking_splits_long_pages": true
+  },
+  {
+    "file": "sid_kotak_midcap.pdf",
+    "pages_extracted": 68,
+    "chunks": 265,
+    "chars_total": 196707,
+    "chars_per_page_sample": [
+      [
+        1,
+        2939,
+        4
+      ],
+      [
+        2,
+        5269,
+        7
+      ],
+      [
+        3,
+        2145,
+        3
+      ],
+      [
+        4,
+        2106,
+        3
+      ],
+      [
+        5,
+        2878,
+        4
+      ]
+    ],
+    "chars_min": 872,
+    "chars_max": 5269,
+    "low_text_pages": [],
+    "long_unsplit": [],
+    "repeated_header_examples": [],
+    "multi_chunk_pages": 66,
+    "chunking_splits_long_pages": true
+  },
+  {
+    "file": "sid_motilal_midcap.pdf",
+    "pages_extracted": 79,
+    "chunks": 247,
+    "chars_total": 183766,
+    "chars_per_page_sample": [
+      [
+        1,
+        2009,
+        3
+      ],
+      [
+        2,
+        708,
+        1
+      ],
+      [
+        3,
+        1516,
+        2
+      ],
+      [
+        4,
+        2595,
+        4
+      ],
+      [
+        5,
+        2477,
+        3
+      ]
+    ],
+    "chars_min": 402,
+    "chars_max": 4234,
+    "low_text_pages": [],
+    "long_unsplit": [],
+    "repeated_header_examples": [
+      "69\u00d7 'SID of Motilal Oswal Midcap Fund '"
+    ],
+    "multi_chunk_pages": 66,
+    "chunking_splits_long_pages": true
+  },
+  {
+    "file": "sid_nippon_growth_midcap.pdf",
+    "pages_extracted": 41,
+    "chunks": 245,
+    "chars_total": 185356,
+    "chars_per_page_sample": [
+      [
+        1,
+        4391,
+        6
+      ],
+      [
+        2,
+        7588,
+        9
+      ],
+      [
+        3,
+        4049,
+        5
+      ],
+      [
+        4,
+        3382,
+        4
+      ],
+      [
+        5,
+        3390,
+        5
+      ]
+    ],
+    "chars_min": 523,
+    "chars_max": 7588,
+    "low_text_pages": [],
+    "long_unsplit": [],
+    "repeated_header_examples": [],
+    "multi_chunk_pages": 40,
+    "chunking_splits_long_pages": true
+  },
+  {
+    "file": "sid_ppfas_flexicap.pdf",
+    "pages_extracted": 74,
+    "chunks": 308,
+    "chars_total": 228789,
+    "chars_per_page_sample": [
+      [
+        1,
+        2003,
+        3
+      ],
+      [
+        2,
+        1036,
+        2
+      ],
+      [
+        3,
+        1226,
+        2
+      ],
+      [
+        4,
+        420,
+        1
+      ],
+      [
+        5,
+        2824,
+        4
+      ]
+    ],
+    "chars_min": 53,
+    "chars_max": 5372,
+    "low_text_pages": [
+      [
+        25,
+        53
+      ]
+    ],
+    "long_unsplit": [],
+    "repeated_header_examples": [],
+    "multi_chunk_pages": 69,
+    "chunking_splits_long_pages": true
+  }
+]

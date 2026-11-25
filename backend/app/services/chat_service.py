@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from backend.app.db.models import ChatMessage, ChatSession
-from backend.app.rag.llm_factory import get_chat_llm
+from backend.app.rag.llm_factory import GREETING_REPLY, get_chat_llm, is_greeting
 from backend.app.rag.qa_chain import (
     NOT_FOUND_MESSAGE,
     build_qa_result,
@@ -24,6 +24,7 @@ from backend.app.rag.qa_chain import (
 )
 from backend.app.rag.semantic_cache import lookup_cache, store_cache
 from backend.app.utils.logging import get_logger
+from backend.app.utils.metrics import get_latency_stats, record_chat_timings
 from backend.app.utils.titles import make_conversation_title
 from backend.app.utils.tokens import count_tokens
 
@@ -168,23 +169,93 @@ async def chat(
     session.add(user_msg)
     await session.flush()
 
-    cached = await lookup_cache(session, message)
+    # Greetings: skip retrieval/cache so we never attach fake citations
+    if is_greeting(message):
+        total_ms = (time.perf_counter() - t_total) * 1000
+        result = build_qa_result(
+            answer=GREETING_REPLY,
+            docs_with_scores=[],
+            tokens_used=count_tokens(GREETING_REPLY),
+            cached=False,
+            retrieval={"strategy": "greeting", "latency_ms": 0},
+        )
+        result["sources"] = []
+        result["retrieved_chunks"] = []
+        result["confidence"] = 0.0
+        result["timings"] = {
+            "cache_lookup_ms": 0.0,
+            "retrieval_ms": 0.0,
+            "generation_ms": 0.0,
+            "total_ms": round(total_ms, 2),
+        }
+        assistant_msg = ChatMessage(
+            id=str(uuid4()),
+            session_id=chat_session.id,
+            role="assistant",
+            content=result["answer"],
+            sources_json="[]",
+            confidence=0.0,
+            tokens_used=result["tokens_used"],
+        )
+        session.add(assistant_msg)
+        await session.flush()
+        return {
+            "session_id": chat_session.id,
+            "message_id": assistant_msg.id,
+            **result,
+        }
+
+    t_cache = time.perf_counter()
+    cached = await lookup_cache(session, message, document_ids=document_ids)
+    cache_lookup_ms = (time.perf_counter() - t_cache) * 1000
+    record_chat_timings(cache_lookup_ms=cache_lookup_ms)
+
     if cached:
+        total_ms = (time.perf_counter() - t_total) * 1000
+        record_chat_timings(total_ms=total_ms, generation_ms=0.0, retrieval_ms=0.0)
         result = build_qa_result(
             answer=cached["answer"],
             docs_with_scores=[],
             tokens_used=0,
             cached=True,
-            retrieval={"strategy": "semantic_cache", "latency_ms": 0},
+            retrieval={
+                "strategy": "semantic_cache",
+                "latency_ms": 0,
+                "cache_lookup_ms": round(cache_lookup_ms, 2),
+            },
         )
         result["sources"] = cached["sources"]
         result["retrieved_chunks"] = cached["sources"]
         result["confidence"] = cached["confidence"]
+        result["timings"] = {
+            "cache_lookup_ms": round(cache_lookup_ms, 2),
+            "retrieval_ms": 0.0,
+            "generation_ms": 0.0,
+            "total_ms": round(total_ms, 2),
+        }
     else:
         messages = await _load_messages(session, chat_session.id)
         summary = await summarize_if_needed(session, chat_session)
         history = _format_recent_history(messages, exclude_last=True)
-        retrieval_query = expand_followup_query(message, _prior_user_questions(messages))
+        from backend.app.config import get_settings as _gs
+
+        _settings = _gs()
+        prior_qs = _prior_user_questions(messages)
+        followup_meta: dict[str, Any] = {}
+        if getattr(_settings, "chat_rewrite_followups", False):
+            from backend.app.rag.followups import rewrite_followup
+
+            asst = [m.content for m in messages if m.role == "assistant"]
+            rewrite = await rewrite_followup(
+                message,
+                prior_qs,
+                use_llm=True,
+                recent_assistant=asst[-3:],
+            )
+            retrieval_query = rewrite.rewritten
+            followup_meta = rewrite.as_dict()
+        else:
+            retrieval_query = expand_followup_query(message, prior_qs)
 
         t_ret = time.perf_counter()
         detailed = await retrieve_detailed(retrieval_query, document_ids=document_ids)
@@ -193,22 +264,83 @@ async def chat(
         retrieval_meta = {
             **detailed.details,
             "retrieval_query": retrieval_query if retrieval_query != message else None,
+            "original_query": message,
+            "rewritten_query": retrieval_query if retrieval_query != message else None,
+            "document_ids": document_ids or [],
             "latency_ms": round(retrieval_ms, 2),
         }
+        if followup_meta:
+            retrieval_meta["followup"] = followup_meta
 
         t_gen = time.perf_counter()
         answer, tokens = await generate_answer(
             message, docs, summary=summary, history=history
         )
         generation_ms = (time.perf_counter() - t_gen) * 1000
-        result = build_qa_result(
-            answer, docs, tokens_used=tokens, cached=False, retrieval=retrieval_meta
-        )
+
+        # Refusal engine (OFF by default — UNCALIBRATED thresholds)
+        if getattr(_settings, "refusal_enabled", False):
+            from backend.app.rag.refusal import (
+                apply_refusal_to_answer,
+                compute_signals,
+                decide,
+                thresholds_from_settings,
+            )
+
+            thr = thresholds_from_settings(_settings)
+            signals = compute_signals(
+                message,
+                faiss_ranked=detailed.dense_results,
+                bm25_ranked=detailed.sparse_results,
+                fused_ranked=docs,
+                thresholds=thr,
+            )
+            verdict = decide(signals, thr)
+            snippets = [d.page_content for d, _ in docs[:3]]
+            answer = apply_refusal_to_answer(
+                answer, verdict, related_snippets=snippets
+            )
+            retrieval_meta["refusal"] = {
+                "decision": verdict.decision,
+                "reason": verdict.reason,
+                "signals": signals.as_dict(),
+                "thresholds_uncalibrated": True,
+            }
+
+        if getattr(_settings, "citations_validate", False):
+            from backend.app.rag.citations import validate_citations
+
+            # Provisional packaging then filter
+            provisional = build_qa_result(
+                answer, docs, tokens_used=tokens, cached=False, retrieval=retrieval_meta
+            )
+            cleaned, cite_stats = validate_citations(
+                provisional["sources"], docs, request_id=str(uuid4())
+            )
+            retrieval_meta["citation_validation"] = cite_stats
+            result = build_qa_result(
+                answer, docs, tokens_used=tokens, cached=False, retrieval=retrieval_meta
+            )
+            result["sources"] = cleaned
+            result["retrieved_chunks"] = cleaned
+        else:
+            result = build_qa_result(
+                answer, docs, tokens_used=tokens, cached=False, retrieval=retrieval_meta
+            )
+        total_ms = (time.perf_counter() - t_total) * 1000
         result["timings"] = {
+            "cache_lookup_ms": round(cache_lookup_ms, 2),
             "retrieval_ms": round(retrieval_ms, 2),
             "generation_ms": round(generation_ms, 2),
-            "total_ms": round((time.perf_counter() - t_total) * 1000, 2),
+            "total_ms": round(total_ms, 2),
+            "faiss_ms": (retrieval_meta.get("semantic") or {}).get("latency_ms"),
+            "bm25_ms": (retrieval_meta.get("bm25") or {}).get("latency_ms"),
         }
+        record_chat_timings(
+            retrieval_ms=retrieval_ms,
+            generation_ms=generation_ms,
+            total_ms=total_ms,
+        )
         if answer != NOT_FOUND_MESSAGE:
             await store_cache(
                 session,
@@ -216,12 +348,15 @@ async def chat(
                 answer,
                 result["sources"],
                 result["confidence"],
+                document_ids=document_ids,
             )
+            await session.flush()
         logger.info(
             "chat_completed",
             session_id=chat_session.id,
             retrieval_ms=round(retrieval_ms, 2),
             generation_ms=round(generation_ms, 2),
+            total_ms=round(total_ms, 2),
             chunks=len(docs),
             cached=False,
         )
@@ -270,7 +405,40 @@ async def chat_stream(
     session.add(user_msg)
     await session.flush()
 
-    cached = await lookup_cache(session, message)
+    if is_greeting(message):
+        yield {
+            "event": "meta",
+            "session_id": chat_session.id,
+            "sources": [],
+            "confidence": 0.0,
+            "cached": False,
+            "retrieval": {"strategy": "greeting", "document_ids": document_ids or []},
+        }
+        yield {"event": "token", "content": GREETING_REPLY}
+        assistant_msg = ChatMessage(
+            id=str(uuid4()),
+            session_id=chat_session.id,
+            role="assistant",
+            content=GREETING_REPLY,
+            sources_json="[]",
+            confidence=0.0,
+            tokens_used=count_tokens(GREETING_REPLY),
+        )
+        session.add(assistant_msg)
+        await session.flush()
+        yield {
+            "event": "done",
+            "message_id": assistant_msg.id,
+            "answer": GREETING_REPLY,
+            "sources": [],
+            "confidence": 0.0,
+            "tokens_used": assistant_msg.tokens_used,
+            "cached": False,
+            "timings": {"total_ms": round((time.perf_counter() - t_total) * 1000, 2)},
+        }
+        return
+
+    cached = await lookup_cache(session, message, document_ids=document_ids)
     if cached:
         yield {
             "event": "meta",
@@ -278,7 +446,7 @@ async def chat_stream(
             "sources": cached["sources"],
             "confidence": cached["confidence"],
             "cached": True,
-            "retrieval": {"strategy": "semantic_cache"},
+            "retrieval": {"strategy": "semantic_cache", "document_ids": document_ids or []},
         }
         yield {"event": "token", "content": cached["answer"]}
         assistant_msg = ChatMessage(
@@ -307,7 +475,22 @@ async def chat_stream(
     messages = await _load_messages(session, chat_session.id)
     summary = await summarize_if_needed(session, chat_session)
     history = _format_recent_history(messages, exclude_last=True)
-    retrieval_query = expand_followup_query(message, _prior_user_questions(messages))
+    from backend.app.config import get_settings as _gs_stream
+
+    _settings_s = _gs_stream()
+    prior_qs = _prior_user_questions(messages)
+    followup_meta: dict[str, Any] = {}
+    if getattr(_settings_s, "chat_rewrite_followups", False):
+        from backend.app.rag.followups import rewrite_followup
+
+        asst = [m.content for m in messages if m.role == "assistant"]
+        rewrite = await rewrite_followup(
+            message, prior_qs, use_llm=True, recent_assistant=asst[-3:]
+        )
+        retrieval_query = rewrite.rewritten
+        followup_meta = rewrite.as_dict()
+    else:
+        retrieval_query = expand_followup_query(message, prior_qs)
 
     t_ret = time.perf_counter()
     detailed = await retrieve_detailed(retrieval_query, document_ids=document_ids)
@@ -316,8 +499,13 @@ async def chat_stream(
     retrieval_meta = {
         **detailed.details,
         "retrieval_query": retrieval_query if retrieval_query != message else None,
+        "original_query": message,
+        "rewritten_query": retrieval_query if retrieval_query != message else None,
+        "document_ids": document_ids or [],
         "latency_ms": round(retrieval_ms, 2),
     }
+    if followup_meta:
+        retrieval_meta["followup"] = followup_meta
     result_shell = build_qa_result("", docs, tokens_used=0, retrieval=retrieval_meta)
 
     yield {
@@ -344,7 +532,14 @@ async def chat_stream(
     confidence = compute_confidence(docs, answer)
 
     if answer != NOT_FOUND_MESSAGE:
-        await store_cache(session, message, answer, result_shell["sources"], confidence)
+        await store_cache(
+            session,
+            message,
+            answer,
+            result_shell["sources"],
+            confidence,
+            document_ids=document_ids,
+        )
 
     assistant_msg = ChatMessage(
         id=str(uuid4()),
@@ -358,16 +553,25 @@ async def chat_stream(
     session.add(assistant_msg)
     await session.flush()
 
+    total_ms = (time.perf_counter() - t_total) * 1000
     timings = {
         "retrieval_ms": round(retrieval_ms, 2),
         "generation_ms": round(generation_ms, 2),
-        "total_ms": round((time.perf_counter() - t_total) * 1000, 2),
+        "total_ms": round(total_ms, 2),
+        "faiss_ms": (retrieval_meta.get("semantic") or {}).get("latency_ms"),
+        "bm25_ms": (retrieval_meta.get("bm25") or {}).get("latency_ms"),
     }
+    record_chat_timings(
+        retrieval_ms=retrieval_ms,
+        generation_ms=generation_ms,
+        total_ms=total_ms,
+    )
     logger.info(
         "chat_stream_completed",
         session_id=chat_session.id,
         retrieval_ms=timings["retrieval_ms"],
         generation_ms=timings["generation_ms"],
+        total_ms=timings["total_ms"],
         chunks=len(docs),
         cached=False,
     )
@@ -426,5 +630,6 @@ async def admin_stats(session: AsyncSession) -> dict[str, Any]:
         "questions_answered": answered,
         "feedback_up": feedback_up,
         "feedback_down": feedback_down,
+        "latency": get_latency_stats(),
         **cache,
     }

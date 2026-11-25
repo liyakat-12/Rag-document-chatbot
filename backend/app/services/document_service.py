@@ -46,14 +46,35 @@ async def save_and_index_pdf(
     Persist a PDF to disk, parse, chunk, embed, and store in FAISS + BM25.
 
     Returns (document, pipeline_stages) where stages reflect work that actually ran.
+    Identical content (SHA-256) is not indexed twice — returns the existing document.
     """
     stages: list[dict[str, Any]] = []
     t_all = time.perf_counter()
 
+    from backend.app.rag.content_hash import (
+        find_document_by_hash,
+        register_hash,
+        sha256_bytes,
+    )
+
+    digest = sha256_bytes(raw_bytes)
+    existing_id = find_document_by_hash(digest)
+    if existing_id:
+        existing = await get_document(session, existing_id)
+        if existing and existing.status == "indexed":
+            stages.append(
+                _stage("deduplicated", True, 0, f"identical content hash {digest[:12]}")
+            )
+            return existing, stages
+
     safe_name = sanitize_filename(original_filename)
+    # Ensure stored path cannot escape upload_dir
+    upload_dir = upload_dir.resolve()
     doc_id = str(uuid4())
     stored_name = f"{doc_id}_{safe_name}"
-    file_path = upload_dir / stored_name
+    file_path = (upload_dir / stored_name).resolve()
+    if not str(file_path).startswith(str(upload_dir)):
+        raise ValueError("Invalid storage path.")
 
     t0 = time.perf_counter()
     file_path.write_bytes(raw_bytes)
@@ -66,6 +87,8 @@ async def save_and_index_pdf(
         file_path=str(file_path),
         file_size=len(raw_bytes),
         status="pending",
+        file_type="pdf",
+        extraction_method="text",
     )
     session.add(document)
     await session.flush()
@@ -76,6 +99,21 @@ async def save_and_index_pdf(
         if not pages:
             raise ValueError("PDF contains no extractable text pages.")
         document.page_count = len(pages)
+        # Persist low-text flags for Documents UI when ingest.flag_low_text_pages is on
+        low_text = []
+        for p in pages:
+            doc_flags = p.metadata.get("low_text_pages_doc")
+            if isinstance(doc_flags, list) and doc_flags:
+                low_text = doc_flags
+                break
+        if low_text:
+            import json
+
+            meta_path = Path(str(file_path) + ".meta.json")
+            meta_path.write_text(
+                json.dumps({"low_text_pages": low_text}, indent=2),
+                encoding="utf-8",
+            )
         stages.append(
             _stage(
                 "extracted",
@@ -98,7 +136,15 @@ async def save_and_index_pdf(
         )
 
         t0 = time.perf_counter()
-        chunks = split_documents(pages, document_id=doc_id, filename=original_filename)
+        upload_ts = document.created_at.isoformat() if document.created_at else None
+        chunks = split_documents(
+            pages,
+            document_id=doc_id,
+            filename=original_filename,
+            file_type="pdf",
+            extraction_method="text",
+            uploaded_at=upload_ts,
+        )
         if not chunks:
             raise ValueError("No text chunks could be created from this PDF.")
         stages.append(
@@ -115,6 +161,13 @@ async def save_and_index_pdf(
                     page_number=int(chunk.metadata["page_number"]),
                     content=chunk.page_content,
                     token_count=int(chunk.metadata.get("token_count", 0)),
+                    filename=str(chunk.metadata.get("filename") or original_filename),
+                    file_type=str(chunk.metadata.get("file_type") or "pdf"),
+                    location_type=str(chunk.metadata.get("location_type") or "page"),
+                    location=str(chunk.metadata.get("location") or chunk.metadata.get("page_number") or ""),
+                    parent_chunk_id=chunk.metadata.get("parent_chunk_id"),
+                    extraction_method=str(chunk.metadata.get("extraction_method") or "text"),
+                    uploaded_at=document.created_at,
                 )
             )
         session.add_all(chunk_rows)
@@ -138,6 +191,7 @@ async def save_and_index_pdf(
 
         document.chunk_count = len(chunks)
         document.status = "indexed"
+        register_hash(digest, doc_id)
         total_ms = (time.perf_counter() - t_all) * 1000
         logger.info(
             "document_indexed",
@@ -148,10 +202,16 @@ async def save_and_index_pdf(
         )
     except Exception as exc:
         document.status = "error"
-        document.error_message = str(exc)
-        stages.append(_stage("failed", False, 0, str(exc)[:200]))
+        # Never leak internals to API clients — store short safe message
+        safe = "Document processing failed."
+        if "encrypt" in str(exc).lower() or "password" in str(exc).lower():
+            safe = "Encrypted or password-protected PDFs are not supported."
+        elif "no extractable" in str(exc).lower() or "no text" in str(exc).lower():
+            safe = "PDF contains no extractable text."
+        document.error_message = safe
+        stages.append(_stage("failed", False, 0, safe))
         logger.error("document_index_failed", document_id=doc_id, error=str(exc))
-        raise
+        raise ValueError(safe) from None
 
     await session.flush()
     await session.refresh(document)
@@ -180,6 +240,12 @@ async def delete_document(session: AsyncSession, document_id: str) -> bool:
 
     await session.delete(document)
     rebuild_bm25_index()
+    # Drop every cache entry (conservative: any answer may have used this doc)
+    from backend.app.rag.semantic_cache import clear_semantic_cache
+    from backend.app.rag.content_hash import unregister_document
+
+    unregister_document(document_id)
+    await clear_semantic_cache(session)
     logger.info("document_deleted", document_id=document_id)
     return True
 
@@ -205,8 +271,16 @@ async def reindex_all(session: AsyncSession) -> tuple[int, int]:
 
             pages = load_pdf(path)
             document.page_count = len(pages)
+            ft = getattr(document, "file_type", None) or "pdf"
+            em = getattr(document, "extraction_method", None) or "text"
+            upload_ts = document.created_at.isoformat() if document.created_at else None
             chunks = split_documents(
-                pages, document_id=document.id, filename=document.original_filename
+                pages,
+                document_id=document.id,
+                filename=document.original_filename,
+                file_type=ft,
+                extraction_method=em,
+                uploaded_at=upload_ts,
             )
             chunk_rows = []
             for chunk in chunks:
@@ -218,6 +292,17 @@ async def reindex_all(session: AsyncSession) -> tuple[int, int]:
                         page_number=int(chunk.metadata["page_number"]),
                         content=chunk.page_content,
                         token_count=int(chunk.metadata.get("token_count", 0)),
+                        filename=str(chunk.metadata.get("filename") or document.original_filename),
+                        file_type=str(chunk.metadata.get("file_type") or ft),
+                        location_type=str(chunk.metadata.get("location_type") or "page"),
+                        location=str(
+                            chunk.metadata.get("location")
+                            or chunk.metadata.get("page_number")
+                            or ""
+                        ),
+                        parent_chunk_id=chunk.metadata.get("parent_chunk_id"),
+                        extraction_method=str(chunk.metadata.get("extraction_method") or em),
+                        uploaded_at=document.created_at,
                     )
                 )
             session.add_all(chunk_rows)
@@ -232,6 +317,9 @@ async def reindex_all(session: AsyncSession) -> tuple[int, int]:
 
     total_chunks = rebuild_from_documents(all_lc_docs)
     rebuild_bm25_index()
+    from backend.app.rag.semantic_cache import clear_semantic_cache
+
+    await clear_semantic_cache(session)
     logger.info("reindex_complete", documents=len(documents), chunks=total_chunks)
     return len(documents), total_chunks
 

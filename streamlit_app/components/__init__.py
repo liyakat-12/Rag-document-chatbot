@@ -24,6 +24,17 @@ def fmt_bytes(n: int) -> str:
     return f"{n / 1024:.0f} KB"
 
 
+def truncate_at_word(text: str, max_len: int = 28) -> str:
+    """Cut at a word boundary; never mid-word."""
+    text = (text or "").strip()
+    if len(text) <= max_len:
+        return text
+    cut = text[: max_len - 1]
+    if " " in cut:
+        cut = cut.rsplit(" ", 1)[0]
+    return cut.rstrip(".,;:/-_") + "…"
+
+
 def fmt_status(status: str) -> tuple[str, str]:
     s = (status or "").lower()
     if s == "indexed":
@@ -35,15 +46,66 @@ def fmt_status(status: str) -> tuple[str, str]:
     return status.title() if status else "Unknown", "status-warn"
 
 
-def confidence_bar(confidence: float | None) -> str:
+def status_dot_class(status: str) -> str:
+    s = (status or "").lower()
+    if s == "indexed":
+        return "ok"
+    if s in {"pending", "indexing"}:
+        return "warn"
+    if s == "error":
+        return "err"
+    return "warn"
+
+
+def confidence_label(confidence: float | None) -> str:
+    """Descriptive evidence band from the retrieval-strength heuristic."""
     if confidence is None:
-        return ""
-    pct = max(0, min(100, int(round(float(confidence) * 100))))
+        return "Unknown evidence"
+    c = float(confidence)
+    if c <= 0:
+        return "Insufficient evidence"
+    if c < 0.45:
+        return "Limited evidence"
+    if c < 0.75:
+        return "Moderate evidence"
+    return "Strong evidence"
+
+
+def confidence_badge(n_documents: int = 1) -> str:
+    """User-facing plain badge (no scores / percentages)."""
+    n = max(0, int(n_documents or 0))
+    label = f"Found in {n} document" if n == 1 else f"Found in {n} documents"
     return (
         f'<div style="margin:.35rem 0 .55rem;">'
-        f'<span class="meta-chip">Grounding confidence {pct}%</span>'
+        f'<span class="meta-chip evidence-strong">{label}</span>'
+        f"</div>"
+    )
+
+
+def confidence_bar(confidence: float | None) -> str:
+    """Developer-mode retrieval strength details (scores + heuristic %)."""
+    if confidence is None:
+        return ""
+    c = float(confidence)
+    if c <= 0:
+        return ""
+    label = confidence_label(confidence)
+    css = (
+        "evidence-strong"
+        if c >= 0.75
+        else "evidence-limited"
+        if c >= 0.45
+        else "evidence-none"
+    )
+    pct = max(0, min(100, int(round(c * 100))))
+    return (
+        f'<div style="margin:.35rem 0 .55rem;">'
+        f'<span class="meta-chip {css}">{label}</span>'
         f'<div class="conf-bar"><span style="width:{pct}%;"></span></div>'
-        f'<div style="font-size:.72rem;color:var(--dm-muted);">Heuristic score from retrieval strength</div>'
+        f'<div style="font-size:.72rem;color:var(--dm-text-muted);">'
+        f'Retrieval strength heuristic ({pct}%) from fused FAISS+BM25 scores — '
+        f'not a calibrated probability of correctness'
+        f"</div>"
         f"</div>"
     )
 

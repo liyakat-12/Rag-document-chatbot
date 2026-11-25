@@ -44,6 +44,21 @@ class DocumentStats(BaseModel):
     indexed_documents: int
 
 
+class DocumentPageMeta(BaseModel):
+    """Metadata + optional ingest quality flags for the Documents viewer."""
+
+    id: str
+    original_filename: str
+    page_count: int
+    chunk_count: int
+    file_size: int
+    status: str
+    error_message: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+    low_text_pages: list[dict[str, Any]] = Field(default_factory=list)
+
+
 class IngestStage(BaseModel):
     name: str
     ok: bool
@@ -143,6 +158,7 @@ class AdminStats(BaseModel):
     questions_answered: int = 0
     feedback_up: int = 0
     feedback_down: int = 0
+    latency: dict[str, Any] = Field(default_factory=dict)
 
 
 class HealthResponse(BaseModel):
@@ -152,6 +168,7 @@ class HealthResponse(BaseModel):
     llm_provider: str
     embedding_provider: str = ""
     retrieval_strategy: str = "hybrid_rrf"
+    ready: bool = True
 
 
 class SystemInfo(BaseModel):

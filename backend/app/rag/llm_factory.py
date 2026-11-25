@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from functools import lru_cache
 
 from langchain_anthropic import ChatAnthropic
@@ -20,6 +21,21 @@ EXTRACTIVE_FALLBACK_PREFIX = (
     "AI generation is currently unavailable. "
     "Showing retrieved document information instead.\n\n"
 )
+
+GREETING_REPLY = (
+    "Hello — I'm DocuMind. Ask a question about your uploaded PDFs "
+    "(for example: what this document is about, or summarize a section)."
+)
+_GREETING_RE = re.compile(
+    r"^(hi|hello|hey|thanks|thank you|good morning|good evening)[!?.]*$",
+    re.IGNORECASE,
+)
+
+
+def is_greeting(message: str | None) -> bool:
+    """True for short social greetings that should not run retrieval."""
+    return bool(_GREETING_RE.fullmatch((message or "").strip()))
+
 
 
 class ExtractiveChatModel(BaseChatModel):
@@ -105,22 +121,114 @@ class ExtractiveChatModel(BaseChatModel):
             elif block:
                 content_blocks.append(block)
 
+        q_probe = ""
+        if "User question:" in human:
+            q_probe = human.split("User question:", 1)[1].split("Write a grounded", 1)[0].strip().lower()
+        if is_greeting(q_probe):
+            return GREETING_REPLY
+
         if not content_blocks or sum(len(b) for b in content_blocks) < 20:
             return NOT_FOUND_MESSAGE
 
-        q_words = {w.lower() for w in question.split() if len(w) > 3}
+        def _clean(text: str) -> str:
+            # Fix common PDF extraction artifacts (split words, runaway whitespace)
+            text = text.replace("\u00ad", "")  # soft hyphen
+            text = re.sub(r"(\w)-\s+(\w)", r"\1\2", text)
+            text = re.sub(r"[ \t]+", " ", text)
+            text = re.sub(r"\n{3,}", "\n\n", text)
+            return text.strip()
+
+        content_blocks = [_clean(b) for b in content_blocks if _clean(b)]
+
+        def _words(text: str) -> set[str]:
+            raw = re.findall(r"[a-z0-9]{3,}", text.lower())
+            out: set[str] = set()
+            for w in raw:
+                out.add(w)
+                if w.endswith("s") and len(w) > 4:
+                    out.add(w[:-1])
+                else:
+                    out.add(w + "s")
+            return out
+
+        q_lower = question.lower()
+        is_summary = bool(
+            re.search(
+                r"\b(summar(y|ise|ize)|main points?|key points?|overview|what is this|"
+                r"about this document|tl;?dr|highlights)\b",
+                q_lower,
+            )
+        )
+
+        q_words = _words(question)
+        stop = {
+            "what", "which", "when", "where", "that", "this", "with", "from",
+            "have", "does", "about", "your", "document", "documents", "please",
+            "tell", "give", "list", "named", "name", "the", "and", "are",
+            "was", "were", "for", "how", "who", "why", "any", "main", "points",
+            "summarize", "summary", "overview", "key",
+        }
+        q_words -= stop
 
         def score(s: str) -> int:
-            words = {w.lower() for w in s.split() if len(w) > 3}
-            return len(q_words & words)
+            return len(q_words & _words(s)) if q_words else 0
 
         ranked = sorted(content_blocks, key=score, reverse=True)
-        top = ranked[:2]
-        body = "\n\n".join(top)
-        if len(body) > 1800:
-            body = body[:1800] + "…"
-        header = "Offline mode · Extractive answer from retrieved passages:\n\n"
-        return header + body
+        if not ranked:
+            return NOT_FOUND_MESSAGE
+
+        # --- Summary / overview: bullet points from several passages ---
+        if is_summary:
+            bullets: list[str] = []
+            seen: set[str] = set()
+            for block in ranked[:4]:
+                sentences = [
+                    s.strip()
+                    for s in re.split(r"(?<=[.!?])\s+", block)
+                    if len(s.strip()) > 40
+                ]
+                # Prefer the opening sentence of each chunk (usually section topic)
+                pick = sentences[:2] if sentences else [block[:220]]
+                for sent in pick:
+                    key = sent[:80].lower()
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    if len(sent) > 220:
+                        sent = sent[:220].rsplit(" ", 1)[0] + "…"
+                    bullets.append(sent)
+                    if len(bullets) >= 5:
+                        break
+                if len(bullets) >= 5:
+                    break
+            if not bullets:
+                return NOT_FOUND_MESSAGE
+            body = "\n".join(f"- {b}" for b in bullets)
+            return (
+                "**Document summary** (extractive · offline — enable `LLM_PROVIDER=openai` "
+                "for a rewritten synthesis)\n\n"
+                f"{body}\n\n"
+                "_Based on the highest-ranked passages from your PDF. "
+                "Open Sources below to verify._"
+            )
+
+        # --- Normal Q&A: concise lead from best-matching passage ---
+        top = [t for t in ranked[:2] if t.strip()]
+        primary = top[0]
+        sentences = re.split(r"(?<=[.!?])\s+", primary)
+        lead = " ".join(sentences[:3]).strip() if sentences else primary[:500]
+        if len(lead) > 700:
+            lead = lead[:700].rsplit(" ", 1)[0] + "…"
+        extras = ""
+        if len(top) > 1:
+            extras = "\n\n**Related passage:**\n" + top[1][:450]
+            if len(top[1]) > 450:
+                extras += "…"
+        return (
+            "**Answer from your documents** (extractive · offline)\n\n"
+            + lead
+            + extras
+        )
 
 
 def get_chat_llm(settings: Settings | None = None, streaming: bool = False) -> BaseChatModel:

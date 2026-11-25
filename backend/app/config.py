@@ -57,7 +57,7 @@ class Settings(BaseSettings):
     upload_dir: str = "uploads"
     vector_store_dir: str = "vector_store"
     max_upload_size_mb: int = 40
-    allowed_extensions: str = ".pdf"
+    allowed_extensions: str = ".pdf,.docx"
 
     # RAG
     chunk_size: int = 1000
@@ -66,9 +66,56 @@ class Settings(BaseSettings):
     hybrid_search_weight: float = 0.5
     semantic_cache_enabled: bool = True
     semantic_cache_threshold: float = 0.95
+    # Similarity scan embeds every miss — off by default for snappy exact-hash cache
+    semantic_cache_similarity: bool = False
     # 384 for BAAI/bge-small-en-v1.5 (local); 1536 for text-embedding-3-small
     embedding_dimensions: int = 384
     token_budget_per_request: int = 8000
+
+    # Refusal engine (Phase 2) — OFF by default; thresholds UNCALIBRATED
+    refusal_enabled: bool = False
+    refusal_min_rank_agreement: float = 0.25  # UNCALIBRATED
+    refusal_min_faiss_similarity: float = 0.35  # UNCALIBRATED
+    refusal_min_bm25_score: float = 1.0  # UNCALIBRATED
+    refusal_min_content_term_coverage: float = 0.30  # UNCALIBRATED
+    refusal_min_critical_term_coverage: float = 0.40  # UNCALIBRATED
+    refusal_coverage_top_n: int = 4  # UNCALIBRATED
+    refusal_not_found_hard_fails: int = 3  # UNCALIBRATED
+    refusal_weak_evidence_soft_fails: int = 2  # UNCALIBRATED
+
+    # Retrieval extras (Phase 3) — OFF / current behaviour by default
+    retrieval_bm25_tokenizer: Literal["whitespace", "normalized"] = "whitespace"
+    retrieval_reranker_enabled: bool = False
+    retrieval_reranker_top_n: int = 16
+    retrieval_reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    retrieval_exact_match_boost: bool = False
+    retrieval_dedupe_near_duplicates: bool = False
+
+    # Citation validation (Phase 4) — OFF by default
+    citations_validate: bool = False
+
+    # Ingestion quality (Phase 3 candidates) — OFF by default; change index hash when on
+    ingest_strip_repeated_headers_footers: bool = False
+    ingest_flag_low_text_pages: bool = False
+    ingest_low_text_char_threshold: int = 100
+
+    # Conversational follow-ups — OFF by default (keeps snapshot / expand_followup_query path)
+    chat_rewrite_followups: bool = False
+
+    # Sentence-level extractive answers — OFF by default (snapshot uses classic extractive)
+    answer_sentence_select: bool = False
+    # term | crossencoder | crossencoder_context | clean_chunk
+    answer_sentence_select_mode: str = "term"
+    answer_sentence_max_words: int = 60
+
+    # Stronger hyphenation fix at ingest — OFF by default (changes chunk text / index hash)
+    ingest_fix_hyphenation: bool = False
+
+    # Developer mode: show ranking scores / percentages in the UI
+    ui_developer_mode: bool = False
+
+    # Prompt-injection guard — on for LLM providers only; extractive unaffected
+    llm_injection_guard: bool = True
 
     # Database
     database_url: str = "sqlite+aiosqlite:///./data/chatbot.db"

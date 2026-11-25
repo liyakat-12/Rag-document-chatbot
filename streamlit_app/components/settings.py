@@ -11,8 +11,9 @@ from components import friendly_error
 
 
 def render_settings(client_factory: Callable, api_base: str) -> None:
+    st.markdown('<p class="page-kicker">Configuration</p>', unsafe_allow_html=True)
     st.markdown("## Settings")
-    st.caption("Configured via environment variables (`.env`). Secrets are never shown.")
+    st.caption("Values come from `.env`. Secrets are never displayed here.")
 
     try:
         info = client_factory().system_info()
@@ -23,10 +24,13 @@ def render_settings(client_factory: Callable, api_base: str) -> None:
         except Exception:
             return
 
+    provider = info.get("llm_provider", "—")
     st.markdown("### Generation")
     g1, g2, g3 = st.columns(3)
-    g1.metric("LLM provider", info.get("llm_provider", "—"))
-    g2.metric("Model", info.get("openai_chat_model", "—"))
+    g1.metric("LLM provider", provider)
+    # Avoid implying an external chat model is active in extractive mode
+    model_label = "—" if provider == "extractive" else (info.get("openai_chat_model") or "—")
+    g2.metric("Model", model_label)
     g3.metric("Temperature", info.get("llm_temperature", "—"))
 
     st.markdown("### Embeddings & retrieval")
@@ -37,6 +41,30 @@ def render_settings(client_factory: Callable, api_base: str) -> None:
 
     st.markdown("### Connection")
     st.code(api_base, language="text")
+    status = st.session_state.get("backend_status") or "—"
+    st.caption(f"UI status: {status} · provider `{provider}`")
+    if st.button("Retry connection", key="settings_health_retry"):
+        st.session_state["_force_health_refresh"] = True
+        st.rerun()
+    try:
+        ready = client_factory().health()
+        st.caption(
+            f"Status: {'ready' if ready.get('ready', True) else 'degraded'} · "
+            f"version {ready.get('version', '—')}"
+        )
+    except Exception:
+        st.warning("Backend not reachable from this UI.")
+
+    if provider == "extractive":
+        st.info(
+            "Offline extractive mode — answers are built from retrieved passages "
+            "(no external LLM). Set `LLM_PROVIDER=openai` in `.env` for synthesis."
+        )
+    else:
+        st.info(
+            "External LLM providers send retrieved context to the configured API. "
+            "Extractive mode keeps answering fully local."
+        )
 
     with st.expander("Advanced configuration", expanded=False):
         st.markdown(

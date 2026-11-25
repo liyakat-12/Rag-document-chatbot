@@ -1,10 +1,19 @@
 """Unit tests for utilities and RAG helpers."""
 
+from backend.app.rag.llm_factory import GREETING_REPLY, is_greeting
 from backend.app.rag.qa_chain import NOT_FOUND_MESSAGE, compute_confidence
 from backend.app.utils.security import sanitize_filename
 from backend.app.utils.text import clean_text
 from backend.app.utils.tokens import count_tokens
 from langchain_core.documents import Document
+
+
+def test_is_greeting_accepts_short_social_phrases():
+    assert is_greeting("Hello!")
+    assert is_greeting("hi")
+    assert is_greeting("Thanks")
+    assert not is_greeting("What skills are mentioned?")
+    assert GREETING_REPLY.startswith("Hello")
 
 
 def test_sanitize_filename_strips_path_and_unsafe_chars():

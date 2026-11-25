@@ -163,6 +163,12 @@ def add_documents(documents: list[LCDocument]) -> list[str]:
                 "filename": doc.metadata.get("filename"),
                 "page_number": doc.metadata.get("page_number"),
                 "chunk_index": doc.metadata.get("chunk_index"),
+                "file_type": doc.metadata.get("file_type"),
+                "location_type": doc.metadata.get("location_type"),
+                "location": doc.metadata.get("location"),
+                "parent_chunk_id": doc.metadata.get("parent_chunk_id"),
+                "extraction_method": doc.metadata.get("extraction_method"),
+                "uploaded_at": doc.metadata.get("uploaded_at"),
             }
             meta.setdefault("doc_chunk_ids", {}).setdefault(document_id, []).append(chunk_id)
         _save_metadata(meta)
@@ -241,6 +247,11 @@ def rebuild_from_documents(all_docs: list[LCDocument]) -> int:
     return len(all_docs)
 
 
+def _l2_to_similarity(distance: float) -> float:
+    """Convert FAISS L2 distance (lower=better) to a [0, 1]-ish similarity."""
+    return 1.0 / (1.0 + max(0.0, float(distance)))
+
+
 def similarity_search(
     query: str,
     k: int = 4,
@@ -248,17 +259,15 @@ def similarity_search(
 ) -> list[tuple[LCDocument, float]]:
     """Vector similarity search with optional metadata filtering."""
     store = get_vector_store()
-    filter_dict = None
     if document_ids:
-        # FAISS langchain filter: custom callable via fetch then filter
-        results = store.similarity_search_with_score(query, k=k * 3)
+        # Fetch extra then filter — FAISS metadata filter is not always available
+        results = store.similarity_search_with_score(query, k=max(k * 5, 20))
         filtered = [
-            (doc, float(score))
+            (doc, _l2_to_similarity(score))
             for doc, score in results
             if doc.metadata.get("document_id") in document_ids
         ]
         return filtered[:k]
 
     results = store.similarity_search_with_score(query, k=k)
-    # FAISS L2 distance: lower is better — convert to similarity-ish score
-    return [(doc, float(score)) for doc, score in results]
+    return [(doc, _l2_to_similarity(score)) for doc, score in results]

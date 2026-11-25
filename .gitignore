@@ -42,6 +42,23 @@ frontend/dist/
 .coverage
 htmlcov/
 .pytest_cache/
+evals/last_report.json
+
+# Eval corpus: keep public fixtures; never commit personal PDFs or extract cache
+evals/corpus/_extracted_pages.json
+evals/corpus/_build_corpus.py
+evals/corpus/Liyakat_*.pdf
+evals/corpus/MediAssist_*.pdf
+evals/corpus/deepfake_*.pdf
+# Isolated evaluation FAISS/BM25 caches
+evals/.index/
+
+# Local smoke artifacts
+uploads/_smoke_*
+
+# Local service logs (run_documind.bat)
+.uvicorn_*.log
+.streamlit_*.log
 
 # OS
 .DS_Store

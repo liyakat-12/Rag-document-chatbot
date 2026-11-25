@@ -1,8 +1,11 @@
-"""Document API routes: upload, list, delete, reindex, stats."""
+"""Document API routes: upload, list, delete, reindex, stats, page viewer."""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi.responses import Response
 from openai import AuthenticationError, OpenAIError, RateLimitError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,6 +13,7 @@ from backend.app.config import get_settings
 from backend.app.db.session import get_db
 from backend.app.models.schemas import (
     DocumentOut,
+    DocumentPageMeta,
     DocumentStats,
     ReindexResponse,
     UploadResponse,
@@ -89,6 +93,13 @@ async def upload_documents(
         ) from exc
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to index document: {exc}",
+        ) from exc
 
     return UploadResponse(
         message=f"Successfully uploaded and indexed {len(documents)} document(s).",
@@ -137,3 +148,79 @@ async def reindex(db: AsyncSession = Depends(get_db)) -> ReindexResponse:
 async def stats(db: AsyncSession = Depends(get_db)) -> DocumentStats:
     data = await document_service.document_stats(db)
     return DocumentStats(**data)
+
+
+@router.get("/{document_id}/meta", response_model=DocumentPageMeta)
+async def document_meta(document_id: str, db: AsyncSession = Depends(get_db)) -> DocumentPageMeta:
+    """Document metadata for the Documents page viewer."""
+    doc = await document_service.get_document(db, document_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found.")
+    low_text = []
+    extra = getattr(doc, "error_message", None)
+    # low_text_pages stored as JSON in error_message prefix is avoided —
+    # read optional sidecar metadata file written at ingest when flag is on.
+    meta_path = Path(doc.file_path).with_suffix(Path(doc.file_path).suffix + ".meta.json")
+    if meta_path.is_file():
+        import json
+
+        try:
+            payload = json.loads(meta_path.read_text(encoding="utf-8"))
+            low_text = list(payload.get("low_text_pages") or [])
+        except Exception:
+            low_text = []
+    return DocumentPageMeta(
+        id=doc.id,
+        original_filename=doc.original_filename,
+        page_count=doc.page_count,
+        chunk_count=doc.chunk_count,
+        file_size=doc.file_size,
+        status=doc.status,
+        error_message=doc.error_message,
+        created_at=doc.created_at,
+        updated_at=doc.updated_at,
+        low_text_pages=low_text,
+    )
+
+
+@router.get("/{document_id}/pages/{page_number}")
+async def document_page_image(
+    document_id: str,
+    page_number: int,
+    span: str = Query(default="", max_length=4000),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Render a PDF page as PNG with optional citation span highlight."""
+    from backend.app.rag.page_viewer import render_page_with_highlight
+
+    doc = await document_service.get_document(db, document_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found.")
+    path = Path(doc.file_path)
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="PDF file missing on disk.")
+    if page_number < 1:
+        raise HTTPException(status_code=400, detail="page_number must be >= 1")
+    try:
+        result = render_page_with_highlight(
+            path,
+            page_number,
+            span=span,
+            filename=doc.original_filename,
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to render page: {exc}",
+        ) from exc
+
+    headers = {
+        "X-Match-Mode": result.match_mode,
+        "X-Page-Count": str(result.page_count),
+        "X-Page-Number": str(result.page_number),
+        "X-Cache-Hit": "1" if result.cache_hit else "0",
+        "X-Filename": doc.original_filename,
+    }
+    if result.match_mode == "chunk_fallback" and span:
+        headers["X-Chunk-Fallback"] = "1"
+    return Response(content=result.png_bytes, media_type="image/png", headers=headers)

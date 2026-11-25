@@ -1,0 +1,10 @@
+{"id": "fr_q1_name", "query": "What is the candidate's name on the resume?", "expected": "Jordan Blake", "answerable": true, "key_facts": ["Jordan Blake"]}
+{"id": "fr_q2_cgpa", "query": "What CGPA is listed?", "expected": "7.92 / 10", "answerable": true, "key_facts": ["7.92"]}
+{"id": "fr_q3_degree", "query": "What degree did Jordan complete?", "expected": "B.Tech in Computer Science", "answerable": true, "key_facts": ["B.Tech", "Computer Science"]}
+{"id": "fr_q4_r2", "query": "What R2 relevance correlation is reported?", "expected": "0.69", "answerable": true, "key_facts": ["0.69"]}
+{"id": "fr_q5_etl", "query": "By how much did the Northwind Analytics internship reduce ETL runtime?", "expected": "35%", "answerable": true, "key_facts": ["35%"], "notes": "35% also appears as scholarship — number appears twice"}
+{"id": "fr_q6_expense", "query": "What expense ratio appears in the internship description?", "expected": "0.20%", "answerable": true, "key_facts": ["0.20%"]}
+{"id": "fr_q7_fund_code", "query": "Which fund scheme code example is mentioned in projects?", "expected": "HDFC/O/E/MIF/07/04/0015", "answerable": true, "key_facts": ["HDFC/O/E/MIF/07/04/0015"]}
+{"id": "fr_q8_skills", "query": "Which search libraries are listed under skills?", "expected": "FAISS, BM25", "answerable": true, "key_facts": ["FAISS", "BM25"]}
+{"id": "fr_q9_near_miss_salary", "query": "What was Jordan Blake's annual salary at Contoso Labs?", "expected": "not in document", "answerable": false, "key_facts": [], "notes": "near-miss unanswerable — internship exists, salary does not"}
+{"id": "fr_q10_near_miss_phd", "query": "Where did Jordan complete a Ph.D. in machine learning?", "expected": "not in document", "answerable": false, "key_facts": [], "notes": "near-miss unanswerable — B.Tech only"}

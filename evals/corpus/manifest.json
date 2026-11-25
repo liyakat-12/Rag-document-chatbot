@@ -1,0 +1,234 @@
+{
+  "generated_at": "2026-11-13T06:33:20.681060+00:00",
+  "primary_corpus": "real",
+  "primary_corpus_hash": "136f9e86dcc51157b4089c5d6a240a2f143d5431408ab12444d3306a91a16ab3",
+  "synthetic_corpus_hash": "3eca4ae9ce9177a4aa450637ced7c55beff0a0065efa5426f9c34d1103d1803d",
+  "corpus_hash": "dffd8a578f353c9671c0470d5ffc5154feedf9f9d977d1272e2a732dc5737e3d",
+  "file_count": 21,
+  "files": [
+    {
+      "path": "real/sebi_circular_commodity_overseas_fm_2024-04.pdf",
+      "sha256": "c20d1f8c1ece43726b083d22127eb84ab8ceaeeeadd55a39220fe9c4c9d20528",
+      "bytes": 196172,
+      "pages": 2,
+      "origin": "public_download",
+      "source_url": "https://www.sebi.gov.in/sebi_data/attachdocs/apr-2024/1714500252013.pdf",
+      "license": "SEBI public circular",
+      "notes": "SEBI circular Apr 30, 2024 \u2014 commodity/overseas fund manager ease"
+    },
+    {
+      "path": "real/sebi_mf_master_circular_2024-06.pdf",
+      "sha256": "c01735fc579274c9f37cd3c3d5435d1db241e92df30e5b4a8ff5dc4c2e5fa134",
+      "bytes": 6669107,
+      "pages": 828,
+      "origin": "public_download",
+      "source_url": "https://www.sebi.gov.in/sebi_data/attachdocs/jun-2024/1719488538007.pdf",
+      "license": "SEBI public circular",
+      "notes": "SEBI Master Circular for Mutual Funds dated June 27, 2024"
+    },
+    {
+      "path": "real/sid_hdfc_midcap.pdf",
+      "sha256": "3858f78a7e08e70bdc178884a8bbb75bd3273e4dc6eec525b33c7d3fed392e84",
+      "bytes": 973674,
+      "pages": 73,
+      "origin": "public_download",
+      "source_url": "https://portal.amfiindia.com/spages/2526.pdf",
+      "license": "AMC/AMFI public scheme document \u2014 verify redistribution rights",
+      "notes": "HDFC Mid Cap Fund SID (AMFI portal)"
+    },
+    {
+      "path": "real/sid_kotak_midcap.pdf",
+      "sha256": "2a8fb44cb6098de9ff46031bcd302365b9e52cf1d4d5e46aeefb7c6608de2d90",
+      "bytes": 930467,
+      "pages": 68,
+      "origin": "public_download",
+      "source_url": "https://portal.amfiindia.com/spages/2191.pdf",
+      "license": "AMC/AMFI public scheme document \u2014 verify redistribution rights",
+      "notes": "Kotak Midcap Fund / Emerging Equity SID (AMFI portal)"
+    },
+    {
+      "path": "real/sid_motilal_midcap.pdf",
+      "sha256": "a35dbdbc4a9f04433d0bf331439edb4571dcdbeb05d2ff0b2a2f6ca55991223c",
+      "bytes": 932921,
+      "pages": 79,
+      "origin": "public_download",
+      "source_url": "https://portal.amfiindia.com/spages/7913.pdf",
+      "license": "AMC/AMFI public scheme document \u2014 verify redistribution rights",
+      "notes": "Motilal Oswal Midcap Fund SID (AMFI portal)"
+    },
+    {
+      "path": "real/sid_nippon_growth_midcap.pdf",
+      "sha256": "f32f480b338537e6c6370f9b79920d06e3d133ce40b7ed81b735e6d447a9dcb5",
+      "bytes": 725597,
+      "pages": 41,
+      "origin": "public_download",
+      "source_url": "https://portal.amfiindia.com/spages/139.pdf",
+      "license": "AMC/AMFI public scheme document \u2014 verify redistribution rights",
+      "notes": "Nippon India Growth Mid Cap Fund SID (AMFI portal)"
+    },
+    {
+      "path": "real/sid_ppfas_flexicap.pdf",
+      "sha256": "d74cda506d15fe62b6ff8101cce928b71ad00cb80fdf13632a0ad2fe68f3257d",
+      "bytes": 899648,
+      "pages": 74,
+      "origin": "public_download",
+      "source_url": "https://amc.ppfas.com/downloads/parag-parikh-flexi-cap-fund/SID_PPFCF.pdf",
+      "license": "AMC public scheme document \u2014 verify redistribution rights",
+      "notes": "Parag Parikh Flexi Cap Fund SID (PPFAS AMC)"
+    },
+    {
+      "path": "synthetic/_smoke_perf.pdf",
+      "sha256": "453571d62f18cf51ca146c65f9a5dd8c2398a84e407262b627deaaaff01b30c6",
+      "bytes": 1058,
+      "pages": 1,
+      "origin": "synthetic_fixture",
+      "source_url": "generated://evals/corpus/synthetic/_gen_public_fixtures.py",
+      "license": "CC0-equivalent original fixture (DocuMind)",
+      "notes": "Tiny performance resume",
+      "synthetic_notice": "SYNTHETIC: generated / fictional content. Not real fund, regulatory, or personal data. Reserved as the Phase 4 CI fixture."
+    },
+    {
+      "path": "synthetic/api_error_codes.pdf",
+      "sha256": "32d8a462cf9d686731085ca5ee05f41be30af71300d48414f903386ad7aa5013",
+      "bytes": 1316,
+      "pages": 1,
+      "origin": "synthetic_fixture",
+      "source_url": "generated://evals/corpus/synthetic/_gen_public_fixtures.py",
+      "license": "CC0-equivalent original fixture (DocuMind)",
+      "notes": "Generated API error codes for eval",
+      "synthetic_notice": "SYNTHETIC: generated / fictional content. Not real fund, regulatory, or personal data. Reserved as the Phase 4 CI fixture."
+    },
+    {
+      "path": "synthetic/circular_amc_disclosure_2024.pdf",
+      "sha256": "2bc5e4b65db101a88ca4c8e3c761905b4817c70aa89fe66a84ae3903747f903b",
+      "bytes": 2561,
+      "pages": 3,
+      "origin": "synthetic_fixture",
+      "source_url": "generated://evals/corpus/synthetic/_gen_public_fixtures.py",
+      "license": "CC0-equivalent original fixture (DocuMind)",
+      "notes": "SYNTHETIC: synthetic regulatory circular \u2014 fictional",
+      "synthetic_notice": "SYNTHETIC: generated / fictional content. Not real fund, regulatory, or personal data. Reserved as the Phase 4 CI fixture."
+    },
+    {
+      "path": "synthetic/comparative_note_equity_schemes.pdf",
+      "sha256": "f86115efe070ae870723294ee7828eb2fb52d90b3ab75b073b7c00578ff6d766",
+      "bytes": 10923,
+      "pages": 13,
+      "origin": "synthetic_fixture",
+      "source_url": "generated://evals/corpus/synthetic/_gen_public_fixtures.py",
+      "license": "CC0-equivalent original fixture (DocuMind)",
+      "notes": "Long comparative note (no TER numbers)",
+      "synthetic_notice": "SYNTHETIC: generated / fictional content. Not real fund, regulatory, or personal data. Reserved as the Phase 4 CI fixture."
+    },
+    {
+      "path": "synthetic/invoice_fixture_q3.pdf",
+      "sha256": "0bffd1ad4c420a492e49e48368a84562d29cf854863c3bc86496b2dadec31a29",
+      "bytes": 1318,
+      "pages": 1,
+      "origin": "synthetic_fixture",
+      "source_url": "generated://evals/corpus/synthetic/_gen_public_fixtures.py",
+      "license": "CC0-equivalent original fixture (DocuMind)",
+      "notes": "Generated invoice for eval",
+      "synthetic_notice": "SYNTHETIC: generated / fictional content. Not real fund, regulatory, or personal data. Reserved as the Phase 4 CI fixture."
+    },
+    {
+      "path": "synthetic/policy_leave_entitlement.pdf",
+      "sha256": "e6f3571031868cff0bbcc0b63d0e9108f69a43ebea4a641d55da28fc70e002fb",
+      "bytes": 1364,
+      "pages": 1,
+      "origin": "synthetic_fixture",
+      "source_url": "generated://evals/corpus/synthetic/_gen_public_fixtures.py",
+      "license": "CC0-equivalent original fixture (DocuMind)",
+      "notes": "Generated leave policy for eval",
+      "synthetic_notice": "SYNTHETIC: generated / fictional content. Not real fund, regulatory, or personal data. Reserved as the Phase 4 CI fixture."
+    },
+    {
+      "path": "synthetic/qa_design.pdf",
+      "sha256": "d825f9c1935fde035d5db6338da585508bec47beaa512fdeb3354daff71127ea",
+      "bytes": 1067,
+      "pages": 1,
+      "origin": "synthetic_fixture",
+      "source_url": "generated://evals/corpus/synthetic/_gen_public_fixtures.py",
+      "license": "CC0-equivalent original fixture (DocuMind)",
+      "notes": "Generated QA design note",
+      "synthetic_notice": "SYNTHETIC: generated / fictional content. Not real fund, regulatory, or personal data. Reserved as the Phase 4 CI fixture."
+    },
+    {
+      "path": "synthetic/scheme_amgf.pdf",
+      "sha256": "3dce83ade2a42d69b06139effc6906075836ef3df051e69aee88ae8c60867067",
+      "bytes": 2685,
+      "pages": 3,
+      "origin": "synthetic_fixture",
+      "source_url": "generated://evals/corpus/synthetic/_gen_public_fixtures.py",
+      "license": "CC0-equivalent original fixture (DocuMind)",
+      "notes": "Near-identical fund SID for disambiguation questions",
+      "synthetic_notice": "SYNTHETIC: generated / fictional content. Not real fund, regulatory, or personal data. Reserved as the Phase 4 CI fixture."
+    },
+    {
+      "path": "synthetic/scheme_amgf_d.pdf",
+      "sha256": "90aac3f39a1d5551841f4d57af5a5440a951ca1b08e691e183c96f76aa2a749f",
+      "bytes": 2707,
+      "pages": 3,
+      "origin": "synthetic_fixture",
+      "source_url": "generated://evals/corpus/synthetic/_gen_public_fixtures.py",
+      "license": "CC0-equivalent original fixture (DocuMind)",
+      "notes": "Near-identical fund SID for disambiguation questions",
+      "synthetic_notice": "SYNTHETIC: generated / fictional content. Not real fund, regulatory, or personal data. Reserved as the Phase 4 CI fixture."
+    },
+    {
+      "path": "synthetic/scheme_bfcf.pdf",
+      "sha256": "fe5670f30cdeed930dc8d3029f767e1448085cdc402fbff116e43a04b2428fd7",
+      "bytes": 2645,
+      "pages": 3,
+      "origin": "synthetic_fixture",
+      "source_url": "generated://evals/corpus/synthetic/_gen_public_fixtures.py",
+      "license": "CC0-equivalent original fixture (DocuMind)",
+      "notes": "Near-identical fund SID for disambiguation questions",
+      "synthetic_notice": "SYNTHETIC: generated / fictional content. Not real fund, regulatory, or personal data. Reserved as the Phase 4 CI fixture."
+    },
+    {
+      "path": "synthetic/scheme_bfcf_d.pdf",
+      "sha256": "6365aeefe3a81d96ed1638f23b8c86b3ca149c17ae801ae5d0224fbcf8684ad5",
+      "bytes": 2666,
+      "pages": 3,
+      "origin": "synthetic_fixture",
+      "source_url": "generated://evals/corpus/synthetic/_gen_public_fixtures.py",
+      "license": "CC0-equivalent original fixture (DocuMind)",
+      "notes": "Near-identical fund SID for disambiguation questions",
+      "synthetic_notice": "SYNTHETIC: generated / fictional content. Not real fund, regulatory, or personal data. Reserved as the Phase 4 CI fixture."
+    },
+    {
+      "path": "synthetic/scheme_cldf.pdf",
+      "sha256": "d569b6be73c6adcd0b658bc7b810f0b4ba3381cf95424f588fdcccbb4f2a7698",
+      "bytes": 2669,
+      "pages": 3,
+      "origin": "synthetic_fixture",
+      "source_url": "generated://evals/corpus/synthetic/_gen_public_fixtures.py",
+      "license": "CC0-equivalent original fixture (DocuMind)",
+      "notes": "Near-identical fund SID for disambiguation questions",
+      "synthetic_notice": "SYNTHETIC: generated / fictional content. Not real fund, regulatory, or personal data. Reserved as the Phase 4 CI fixture."
+    },
+    {
+      "path": "synthetic/scheme_cldf_d.pdf",
+      "sha256": "52677842cb4e782c181d4899ed06f962c2c47884c8424fe2f2843b1a0d031eb7",
+      "bytes": 2689,
+      "pages": 3,
+      "origin": "synthetic_fixture",
+      "source_url": "generated://evals/corpus/synthetic/_gen_public_fixtures.py",
+      "license": "CC0-equivalent original fixture (DocuMind)",
+      "notes": "Near-identical fund SID for disambiguation questions",
+      "synthetic_notice": "SYNTHETIC: generated / fictional content. Not real fund, regulatory, or personal data. Reserved as the Phase 4 CI fixture."
+    },
+    {
+      "path": "synthetic/smoke_ada2.pdf",
+      "sha256": "256e2b793348e05bfb2fb3334695e17e969740e21455b9297594f559ba239973",
+      "bytes": 1088,
+      "pages": 1,
+      "origin": "synthetic_fixture",
+      "source_url": "generated://evals/corpus/synthetic/_gen_public_fixtures.py",
+      "license": "CC0-equivalent original fixture (DocuMind)",
+      "notes": "Tiny smoke resume",
+      "synthetic_notice": "SYNTHETIC: generated / fictional content. Not real fund, regulatory, or personal data. Reserved as the Phase 4 CI fixture."
+    }
+  ]
+}
