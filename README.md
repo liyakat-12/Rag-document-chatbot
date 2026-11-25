@@ -2,7 +2,7 @@
 
 **Ask your documents. Get grounded answers.**
 
-Private PDF question-answering with **hybrid retrieval** (FAISS + BM25 → Reciprocal Rank Fusion), citations, offline extractive answering, and measurable latency instrumentation.
+Private document question-answering with **hybrid retrieval** (FAISS + BM25 → Reciprocal Rank Fusion), citations, offline extractive answering, and measurable latency instrumentation. Optional advanced retrieval adds multi-query rewriting and cross-encoder reranking.
 
 ---
 
@@ -23,7 +23,9 @@ PDF upload → extract → chunk (+ page metadata)
         → FastEmbed (local) → FAISS
         → BM25 index
 Question → (optional semantic cache)
-        → parallel FAISS + BM25 → RRF fusion → top-k context
+        → (optional) original + rewritten search queries
+        → parallel FAISS + BM25 per query → RRF fusion
+        → (optional) cross-encoder reranking → top-k context
         → Extractive / OpenAI / Azure / Anthropic
         → Answer + citations + retrieval-strength score + timings
 ```
@@ -46,11 +48,43 @@ Question → (optional semantic cache)
 - Multi-PDF upload with stage timings (extract → chunk → embed → BM25)
 - **Search in** document scope (enforced in retrieval + cache keys)
 - Hybrid diagnostics expandable under each answer
+- Optional multi-query rewriting to improve candidate recall
+- Optional cross-encoder reranking over the merged candidate pool
 - Streaming chat with citations and copy/export
 - Semantic cache scoped by documents + answering mode
 - Analytics: cache hit rate + rolling latency p50/p95
 - Offline extractive answers; optional cloud synthesis
 - Eval harness: `python -m evals.run_eval`
+
+---
+
+## Advanced retrieval (opt-in)
+
+The default release configuration stays unchanged. You can enable the advanced retrieval stages in your local `.env`:
+
+```env
+# Query rewriting: original question + up to two alternative search queries
+RETRIEVAL_MULTI_QUERY_ENABLED=true
+RETRIEVAL_MULTI_QUERY_MAX_VARIANTS=3
+RETRIEVAL_MULTI_QUERY_CANDIDATE_MULTIPLIER=4
+
+# Cross-encoder reranking of the merged candidate pool
+RETRIEVAL_RERANKER_ENABLED=true
+RETRIEVAL_RERANKER_TOP_N=16
+RETRIEVAL_RERANKER_MODEL=cross-encoder/ms-marco-MiniLM-L-6-v2
+```
+
+Install the optional local reranker dependency:
+
+```bash
+pip install -r requirements-optional.txt
+```
+
+The original question is always searched. With a generative LLM provider configured, the rewriter proposes bounded alternative phrasings; in offline `extractive` mode it uses a conservative keyword-focused fallback instead. Results from each query are deduplicated and combined with Reciprocal Rank Fusion, then the existing cross-encoder reranker is applied once to the merged candidates. If the reranker dependency or model is unavailable, retrieval falls back to the RRF order.
+
+The cross-encoder model is downloaded on first use and cached locally, so the first request can take longer. Reranking can improve evidence ordering; it cannot correct poor source documents or guarantee a correct answer. The rewrite/reranker settings are included in semantic-cache mode keys so old cached answers are not reused across retrieval configurations.
+
+Both features default to **off** to preserve the existing release-1 behaviour and evaluation baseline. The active settings are visible through `GET /api/v1/admin/system` and retrieval diagnostics returned with chat responses.
 
 ---
 
