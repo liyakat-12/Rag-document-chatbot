@@ -310,8 +310,16 @@ async def retrieve_detailed(
 
     primary = per_query[0]
     total_ms = (time.perf_counter() - started) * 1000
+    signal_source = primary
+    if not (primary.dense_results or primary.sparse_results):
+        signal_source = next(
+            (item for item in per_query if item.dense_results or item.sparse_results),
+            primary,
+        )
+
     details: dict[str, Any] = {
         "strategy": "multi_query_hybrid_rrf",
+        "top_k": top_k,
         "query_rewriting": rewrite_info,
         "query_variants": variants,
         "candidate_k": candidate_k,
@@ -333,6 +341,10 @@ async def retrieve_detailed(
         "semantic": primary.details.get("semantic", {}),
         "bm25": primary.details.get("bm25", {}),
         "fused": {
+            "count": candidate_count,
+            "hits": _summary_hits(fused[:top_k]),
+        },
+        "final": {
             "count": len(results),
             "hits": _summary_hits(results),
         },
@@ -342,8 +354,8 @@ async def retrieve_detailed(
         results=results,
         details=details,
         # Preserve original-query rank lists for the existing refusal diagnostics.
-        dense_results=primary.dense_results,
-        sparse_results=primary.sparse_results,
+        dense_results=signal_source.dense_results,
+        sparse_results=signal_source.sparse_results,
     )
 
 
