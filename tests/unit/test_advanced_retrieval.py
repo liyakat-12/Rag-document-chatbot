@@ -42,9 +42,10 @@ async def test_rewrite_query_uses_keyword_fallback_without_llm(monkeypatch):
             llm_provider="extractive",
         ),
     )
-    variants, details = await advanced.rewrite_query("VPN not working WFH")
+    question = "How can I troubleshoot VPN connection issues while working remotely?"
+    variants, details = await advanced.rewrite_query(question)
 
-    assert variants[0] == "VPN not working WFH"
+    assert variants[0] == question
     assert len(variants) >= 2
     assert details["method"] == "keyword_fallback"
 
