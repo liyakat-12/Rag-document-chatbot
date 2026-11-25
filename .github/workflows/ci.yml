@@ -29,10 +29,11 @@ jobs:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: requirements.txt
-      - name: Install dependencies
+      - name: Install test dependencies (skip optional cross-encoder weights package)
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          grep -v '^sentence-transformers' requirements.txt > /tmp/requirements-ci.txt
+          pip install -r /tmp/requirements-ci.txt
       - name: Compile Python
         run: python -m compileall -q backend tests
       - name: Run test suite
