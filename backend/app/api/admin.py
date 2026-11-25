@@ -90,7 +90,7 @@ async def system_info() -> SystemInfo:
         local_embedding_model=settings.local_embedding_model,
         openai_chat_model=settings.openai_chat_model,
         llm_temperature=settings.llm_temperature,
-        retrieval_strategy="hybrid_rrf",
+        retrieval_strategy=_retrieval_strategy(settings),
         retriever_top_k=settings.retriever_top_k,
         hybrid_search_weight=settings.hybrid_search_weight,
         chunk_size=settings.chunk_size,
