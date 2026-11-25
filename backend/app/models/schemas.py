@@ -151,7 +151,7 @@ class HealthResponse(BaseModel):
     version: str
     llm_provider: str
     embedding_provider: str = ""
-    retrieval_strategy: str = "advanced_hybrid_rrf_rerank"
+    retrieval_strategy: str = "hybrid_rrf"
 
 
 class SystemInfo(BaseModel):
