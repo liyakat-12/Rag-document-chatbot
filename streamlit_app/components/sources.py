@@ -124,7 +124,37 @@ def render_retrieval_details(
     if retrieval.get("strategy") in {"greeting", "empty_library"}:
         return
     with st.expander("Advanced retrieval details", expanded=False):
-        st.caption("Hybrid search diagnostics (FAISS + BM25 → RRF).")
+        st.caption(
+            "Query rewriting (optional) → hybrid search (FAISS + BM25 → RRF) "
+            "→ cross-encoder reranking (optional)."
+        )
+        rewrite = retrieval.get("query_rewriting") or {}
+        reranker = retrieval.get("reranker") or {}
+        if rewrite or retrieval.get("candidate_count") is not None or reranker.get("enabled"):
+            st.markdown("**Query rewriting and reranking**")
+            if rewrite:
+                st.caption(
+                    f"Rewrite: {rewrite.get('method', 'unknown')} · "
+                    f"{rewrite.get('variants', len(retrieval.get('query_variants') or []))} "
+                    "query variant(s)"
+                )
+                for index, query in enumerate(retrieval.get("query_variants") or [], start=1):
+                    st.write(f"{index}. {query}")
+            if retrieval.get("candidate_count") is not None:
+                st.caption(
+                    f"Candidate pool: {retrieval.get('candidate_count')} chunks "
+                    f"before final top-{retrieval.get('top_k', 'K')} selection"
+                )
+            if reranker.get("enabled"):
+                if reranker.get("fallback"):
+                    st.caption(f"Cross-encoder: fallback to RRF ({reranker.get('fallback')})")
+                else:
+                    st.caption(
+                        f"Cross-encoder: {reranker.get('model', 'enabled')} · "
+                        f"{reranker.get('latency_ms', '—')} ms"
+                    )
+            else:
+                st.caption("Cross-encoder: disabled")
         if not _developer_mode():
             st.caption("Enable UI_DEVELOPER_MODE to see ranking scores and percentages.")
             cols = st.columns(3)
