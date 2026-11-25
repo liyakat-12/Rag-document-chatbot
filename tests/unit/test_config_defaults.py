@@ -9,7 +9,7 @@ import pytest
 
 def test_defaults_are_offline_without_env(monkeypatch):
     for key in list(os.environ.keys()):
-        if key.startswith(("LLM_", "EMBEDDING_", "OPENAI_", "AZURE_", "ANTHROPIC_")):
+        if key.startswith(("LLM_", "EMBEDDING_", "OPENAI_", "AZURE_", "ANTHROPIC_", "RETRIEVAL_")):
             monkeypatch.delenv(key, raising=False)
     from backend.app.config import Settings, get_settings
 
